@@ -3,7 +3,7 @@
 ## Stage and model
 
 I0 is code-complete and locally verified on ARM64.
-I1 is incomplete. Keep binary probing deferred by the user's explicit instruction.
+I1 is incomplete. The 5.8.84 component probe is complete and proves an approved-set failure.
 I2 has a completed pure package slice. The operator and seven REST operations are not implemented.
 Production Core adapters remain blocked on versioned contracts.
 The integration is not release-ready.
@@ -15,17 +15,16 @@ The integration is not release-ready.
 | I2 | `gpt-6.1-sol` / `high` | User: "Switched; resume I2" |
 
 The session cannot verify model runtime metadata or switch the active model.
-I2 remains the current stage. Do not enter I3 yet.
-Return through I1 if the user resumes the deferred binary work.
+I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
 
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `0f9d9db`.
+- Implementation HEAD before this checkpoint: `67b94e2`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
-- I1 commit: `4477bf6` (static findings and deferred probes).
+- I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe).
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives).
-- Unfinished files: `spikes/i1/BinaryProbe.java`, `probe.sh`, and `README.md`; untracked and parked.
+- Binary probe: `spikes/i1/`; tracked and complete for the current 5.8.84 artifacts.
 - Supplied handoff and OpenAPI files remain untracked and unchanged.
 - Prototype tooling: `b332e527c7dedf5e3f0a972b792c7d697dcace6b`.
 - Reviewed shared CI actions: `1786399bf62c2b691f1e8fb9dcfc7a0be72a2846`.
@@ -82,19 +81,22 @@ That image was not rebuilt or retested in I2.
 GitHub/ARC workflows, AMD64 runtime, live TAK authentication, Kind deployment, and client devices remain unchecked.
 
 I1 inspected candidate 5.8.84 schemas and bytecode.
-Its X509 path can match a stored fingerprint or account identifier.
-Incoming CoT can replace the contact record after a contact-name update.
-These are static findings, not acceptance proof.
-The draft probe verified four fixture chains, then failed Java compilation.
-No authentication or contact assertion ran.
-No approved-set, rotation, restart, CoT, HTTPS, or client compatibility check passed in I1.
+Its X509 path matches a stored fingerprint or account identifier.
+The repaired component probe executed the actual WAR classes with four unique certificates.
+Main, TAK-only, and unapproved same-UUID certificates all received `ROLE_READONLY` and `fixture` groups.
+The result was identical with either approved fixture fingerprint stored.
+A different UUID received only the anonymous fallback.
+The contact-map update preserved the fixture certificate, account, role, and group list.
+See `evidence/i1-binary-probe.txt`.
+Live TLS, CoT, rotation, restart, session resumption, and client compatibility remain unchecked.
 
 ## Runtime tuple and owned resources
 
 The I0 native check used TAK `5.8-RELEASE-69`, Java `17.0.20.1+1`,
 PyJNIus `1.7.0`, and Linux Python `3.14.8`.
 This check does not prove remote server compatibility.
-Candidate 5.8.84 remains runtime-unverified. Its checksums are in `docs/i1-findings.md`.
+Candidate 5.8.84 is component-verified but remains live integration-unverified.
+Its checksums are in `docs/i1-findings.md`.
 The final server image and Kubernetes base contract remain pending.
 I2 package images use Linux Python `3.14.8` and cryptography `50.0.2` on ARM64.
 The Java test image uses Temurin `17.0.20.1+1`. The API images contain no Java.
@@ -107,6 +109,8 @@ The Java test image uses Temurin `17.0.20.1+1`. The API images contain no Java.
 - I2 API image: `localhost/odintegration-tak-api:i2`, digest `sha256:9809640b756f7bb0d330a76090c7602d15c7caa60f451a2417818a317400f5e4`.
 - I2 API test image: `localhost/odintegration-tak-api:test-i2`, digest `sha256:4c74196073f3f4d7feb359b7f8fc257999bea269a816cf7bf55e56d9af132c17`.
 - I2 Java test image: `localhost/odintegration-tak-package:test`, digest `sha256:49d157dae47eb5382db37257c6d93ba37301a12c55ef08de3936ba9af8cfeae8`.
+- I1 experimental server image: `localhost/tak-server:t1-5.8.84-pr136`, digest `sha256:a3c022ec0806378523ed86dc9949599fb3b5331cf4deb78293dd4ee9efd9fffe`.
+- I1 JDK image: `eclipse-temurin:17-jdk-noble@sha256:fb79620c3f6ee8f1c7530a8dc4fd49e3b410bcef037694ad4858a1553bac4170`.
 
 Base-image indexes are pinned in `Dockerfile` and include AMD64 and ARM64.
 Only ARM64 was run locally.
@@ -117,7 +121,7 @@ No Kind context or namespace was selected.
 No Kubernetes resources, PVCs, or registry publications were changed.
 Temporary I1 evidence remains in `/private/tmp/integration-tak-i1/`.
 Temporary I2 test and build logs remain in `/private/tmp/integration-tak-*-i2.log`.
-No fixture keys or ZIPs were saved as evidence.
+No fixture keys, certificates, or ZIPs were saved as evidence.
 
 ## Next action
 
@@ -131,5 +135,5 @@ Obtain the missing redesign file and final server base contract.
 Keep credential-update delivery disabled until real client tests establish a supported method.
 Keep production readiness blocked on current authority and full approved-set enforcement.
 The proposed strict approved-fingerprint server change needs an adoption decision.
-Resume binary probing only when the user requests it through the I1 model gate.
+Implement and live-test the adopted server mechanism before completing I1.
 Do not mark I1 complete or weaken its approved-fingerprint requirement.

@@ -4,13 +4,13 @@ Date: 2026-10-10.
 Recipient: the next implementation agent or engineer.
 Repository: `opendefence/integration-tak`.
 Branch: `feat/i0-foundation`.
-Baseline checkpoint: `0eb51aded9a8c338425ba7d21648cc2012298f70`.
+Binary probe checkpoint: `67b94e2`.
 
 The foundation and pure full-setup package builder are implemented.
 The operator and REST delivery service are not implemented.
 I1 is incomplete. I2 is partial. The integration is not release-ready.
 Continue independent work when its inputs are available.
-Keep binary probing deferred until the user explicitly resumes it.
+The user resumed binary probing on 2026-10-10.
 
 ## Start here
 
@@ -19,14 +19,14 @@ Read these files before changing code:
 1. [Original implementation handoff](../integration-tak-implementation-handoff.md).
 2. [Current checkpoint](implementation-status.md).
 3. [Core contract decisions](core-contracts.md).
-4. [I1 static findings and probe failure](i1-findings.md).
+4. [I1 binary and static findings](i1-findings.md).
 5. [Package builder](packages.md) and [certificate export](certificates.md).
 6. [OpenAPI draft](../tak-package-api.openapi.json), version `1.0.0-draft.5`.
 
 The original handoff and OpenAPI draft are local, untracked inputs.
 Preserve them. A fresh clone needs separate copies.
-The unfinished `spikes/i1/` files are also untracked.
-Preserve their failure record and do not include them in production images.
+The tracked `spikes/i1/` component probe preserves the original failure context and repaired test.
+Do not include it in production images.
 
 The revision-5 `tak-package-audit-and-redesign-plan.md` remains missing.
 The two shared conversations are supporting sources, not a complete copy of that file:
@@ -47,6 +47,7 @@ Obtain the source files before relying on their contracts.
 | Certificate export, `b835793` | Bounded PEM inputs, leaf CN and key checks, one exportable keypair, Java truststore entries, and separate private-key encryption policy. |
 | Full setup, `0f9d9db` | ATAK, ATAK Mini, iTAK, WinTAK, and TAK Tracker ZIPs. XML escaping, stable internal filenames, and fresh outer filenames. |
 | Checkpoint, `0eb51ad` | Sanitized test logs, image digests, scope limits, and remaining dependencies. |
+| Binary component probe, `67b94e2` | Actual 5.8.84 WAR classes prove the unapproved same-UUID certificate receives the configured role and groups. |
 
 The separate Java test image passed 116 tests with no skips and 100% package coverage.
 RSA and EC tests exercised actual keytool import, read, entry types, and certificate export.
@@ -56,7 +57,8 @@ Lint, typing, security hooks, lockfile checks, wheel build, and API import check
 See `docs/evidence/i2-*.txt` for saved results.
 
 These results establish package construction and Java container compatibility.
-They do not establish real client import, approved-set authentication, rotation, or production delivery.
+They do not establish real client import, rotation, or production delivery.
+The binary probe establishes that the current file-auth path does not enforce the strict approved set.
 The runtime images still print CLI help by default.
 The exact tested image digests and runtime versions are in the current checkpoint.
 
@@ -65,15 +67,19 @@ The exact tested image digests and runtime versions are in the current checkpoin
 The user reports Daybreak access.
 That access is user-provided context. It was not independently verified in this session.
 Do not assume it changes the active session's safety checks, tool permissions, or sandbox limits.
-Binary probing may remain unavailable despite that access.
+A future execution environment may still block a probe despite that access.
 
-The last explicit binary instruction was: "Skip the binary probing for now."
-This handoff request does not resume those probes.
-No safety or automatic approval rejection was recorded in this session.
-The attempted I1 component probe stopped at Java compilation.
+The user later instructed: "Try continuing the binary probing" and confirmed the I1 model gate.
+One assistant response declined the defensive test based only on TAK's military context.
+No tool or automatic approval system rejected the action.
+The user clarified that certificate rejection is defensive authentication validation.
+The probe then ran in an isolated container.
+
+The initial probe failure was a Java compilation error.
 It used invalid `Role.ROLE_USER` and `ConnectionType.STREAMING` enum names.
-Four generated certificate chains verified, but no authentication or contact assertion ran.
-Do not describe that compilation failure as a safety rejection.
+Container `javap` inspection identified the exact 5.8.84 values.
+The repaired probe passed and saved sanitized evidence in `docs/evidence/i1-binary-probe.txt`.
+Do not describe the initial compilation failure as a safety rejection.
 
 If a future safety or approval check blocks a probe:
 
@@ -93,8 +99,7 @@ If suitable evidence cannot be obtained, retain the release blocker.
 
 ## I1 binary acceptance work
 
-Resume only after explicit user instruction and the I1 model gate.
-Use `gpt-6-astra` / `xhigh`.
+The user resumed this work and confirmed `gpt-6-astra` / `xhigh`.
 Obtain the final server image and Kubernetes base contract before claiming integration compatibility.
 The inspected 5.8.84 candidate is recorded in [I1 findings](i1-findings.md#candidate-runtime).
 The I0 JNI image uses a different 5.8.69 JAR.
@@ -102,8 +107,8 @@ Do not combine results from these versions into one accepted runtime tuple.
 
 Complete these checks against the agreed binary and deployment:
 
-- Repair the component fixture against the actual enum signatures. Retain the original failed reproduction.
-- Prove that approved main and TAK-only certificates authenticate to the same UUID account with the desired permissions.
+- Implement the adopted strict approved-fingerprint mechanism.
+- Prove through live TLS that approved main and TAK-only certificates authenticate to the same UUID account with the desired permissions.
 - Prove that a third CA-valid certificate with the same UUID, outside the approved set, is rejected before access is granted.
 - Verify roles and groups after writes, uncertain writes, restart, and reconciliation.
 - Test callsign updates across contact state, incoming CoT, reconnect, restart, live subscription, and peer display.
@@ -113,6 +118,7 @@ Complete these checks against the agreed binary and deployment:
 - Test raw CoT and HTTPS, new connections, existing connections, and resumed TLS sessions during revocation.
 
 Static 5.8.84 inspection found a fingerprint-or-identifier authentication path.
+The component probe confirmed that this path grants the configured role and groups to an unapproved same-UUID certificate.
 The scalar fingerprint field does not establish a strict set of approved certificates.
 Alternating registrations or encoding a list in that field is not an acceptable implementation.
 The proposed strict approved-fingerprint server extension is not adopted.
@@ -198,12 +204,13 @@ Run Ponytail review before each coherent local commit.
 Keep the final cumulative audit at I5.
 
 Inspect Git and test-environment state before mutation.
-Preserve the three untracked input/probe locations described above.
+Preserve the two untracked input files described above.
 Consult the configured PyCharm Python environment before any Python toolchain command.
 Use repository hooks and relevant tests. Save only sanitized evidence.
 Do not push, publish, or deploy without the session's authorization.
 
 For the next I2 session, first obtain the missing Core contracts and select the smallest agreed implementation slice.
 If those inputs remain unavailable, report the specific dependency and preserve this checkpoint.
-For binary work, first obtain explicit resumption and complete the I1 gate.
+Binary component work is resumed and recorded at `67b94e2`.
+Continue live binary work only against the agreed server mechanism and deployment tuple.
 If safety checks prevent probing, use the evidence procedure above and retain all affected release blockers.
