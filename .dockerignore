@@ -1,0 +1,17 @@
+.git
+.idea
+.venv
+.env
+__pycache__
+**/__pycache__
+.coverage*
+.pytest_cache
+.ruff_cache
+.pyrefly_cache
+dist
+build
+htmlcov
+pytest*.xml
+docs
+integration-tak-implementation-handoff.md
+tak-package-api.openapi.json

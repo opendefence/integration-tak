@@ -11,7 +11,8 @@ dependencies = []
 Repository = "https://github.com/opendefence/integration-tak"
 
 [project.optional-dependencies]
-operator = ["cloudcoil[kubernetes,operator]", "pyjnius>=1.7.0,<2.0"]
+# PyJNIus 1.8.0 has Android-only artifacts.
+operator = ["cloudcoil[kubernetes,operator]", "pyjnius==1.7.0"]
 
 [tool.uv.sources]
 cloudcoil = { git = "https://github.com/cloudcoil/cloudcoil.git", tag = "0.8.0" }
@@ -53,7 +54,7 @@ junit_family = "xunit2"
 [tool.coverage.run]
 patch = ["subprocess"]
 branch = true
-omit = ["tests/*", "src/odintegration_tak/__main__.py"]
+omit = ["tests/*"]
 
 [build-system]
 requires = ["hatchling>=1.32.0,<2.0"]

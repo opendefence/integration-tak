@@ -22,8 +22,8 @@ class RejectJava(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, RejectJava())
 import odintegration_tak
-from odintegration_tak.console import main
-main()
+import runpy
+runpy.run_module('odintegration_tak', run_name='__main__')
 """
     result = subprocess.run(
         [sys.executable, "-c", script, *arguments], capture_output=True, text=True, timeout=10, check=True

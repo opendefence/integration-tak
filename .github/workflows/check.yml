@@ -1,0 +1,97 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pvarki/config-ci-library/.github/actions/validate-bumpversion@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: pvarki/config-ci-library/.github/actions/setup-python@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+        with:
+          python-version: "3.14"
+          uv-version: "0.12.13"
+      - run: uv run --locked prek run --all-files
+      - run: uv run --locked pytest --junitxml=pytest.xml
+      - run: uv build --no-sources
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-results
+          path: |
+            pytest.xml
+            dist/
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test the API environment
+        run: |
+          docker build --target api-test -t odintegration-tak:api-test .
+          docker run --rm odintegration-tak:api-test
+      - name: Verify separate runtimes
+        run: |
+          for runtime in api operator; do
+            docker build --target "$runtime" -t "odintegration-tak:$runtime" .
+            docker run --rm "odintegration-tak:$runtime" --help
+            docker run --rm "odintegration-tak:$runtime" --version
+            docker run --rm -i --entrypoint python "odintegration-tak:$runtime" - "$runtime" < docker/check_runtime.py
+          done
+
+  snyk:
+    if: >-
+      vars.SNYK_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: pvarki/config-ci-library/.github/actions/setup-python@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+        with:
+          python-version: "3.14"
+          uv-version: "0.12.13"
+      - uses: pvarki/config-ci-library/.github/actions/snyk-test@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+        with:
+          snyk-org: ${{ vars.SNYK_ORG }}
+          snyk-token: ${{ secrets.SNYK_TOKEN }}
+
+  publish:
+    needs: [python, images]
+    if: vars.PUBLISH_ENABLED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: arc-runner-set
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        runtime: [api, operator]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pvarki/config-ci-library/.github/actions/publish-image@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+        with:
+          product: integration-tak
+          component: ${{ matrix.runtime }}
+          target: ${{ matrix.runtime }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

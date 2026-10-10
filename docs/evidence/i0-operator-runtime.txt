@@ -1,0 +1,3 @@
+TAK: 5.8-RELEASE-69
+JRE: 17.0.20.1+1; JAR SHA-256: 329c3831d0550bef309a7c77ff29c3b398279f973bc9789e0db5c26817ac39c7
+Operator: Python 3.14; native JNI call passed; build tools absent.
