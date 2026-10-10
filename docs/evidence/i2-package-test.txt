@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0
+rootdir: /app
+configfile: pyproject.toml
+plugins: anyio-4.15.1, cov-7.1.0
+collected 116 items
+
+tests/test_certificates.py ..................                            [ 15%]
+tests/test_packages.py ......................................            [ 48%]
+tests/test_certificates.py ..................                            [ 63%]
+tests/test_packages.py ......................................            [ 96%]
+tests/test_console.py ....                                               [100%]
+
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.14.8-final-0 ________________
+
+Name                                                                       Stmts   Miss Branch BrPart  Cover
+------------------------------------------------------------------------------------------------------------
+/opt/venv/lib/python3.14/site-packages/odintegration_tak/__init__.py           1      0      0      0   100%
+/opt/venv/lib/python3.14/site-packages/odintegration_tak/__main__.py           2      0      0      0   100%
+/opt/venv/lib/python3.14/site-packages/odintegration_tak/certificates.py      61      0     24      0   100%
+/opt/venv/lib/python3.14/site-packages/odintegration_tak/console.py            7      0      0      0   100%
+/opt/venv/lib/python3.14/site-packages/odintegration_tak/packages.py          92      0     38      0   100%
+------------------------------------------------------------------------------------------------------------
+TOTAL                                                                        163      0     62      0   100%
+Required test coverage of 90% reached. Total coverage: 100.00%
+============================= 116 passed in 9.60s ==============================

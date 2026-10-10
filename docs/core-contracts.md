@@ -29,7 +29,7 @@ Do not copy these models into the greenfield production implementation.
 
 ## Independent implementation slice
 
-The package renderer can be implemented before these adapters.
+The [pure package renderer](packages.md) is implemented without these adapters.
 Use explicit in-process inputs and fixture credentials.
 Do not label fixture inputs as the Core API.
 Keep construction pure and bounded.
@@ -42,4 +42,4 @@ Keep credential-update delivery disabled until client compatibility evidence exi
 This slice does not enable production downloads.
 Readiness still requires current authority and verified application of the full approved credential set.
 Issuance, operator reconciliation, live grants, and activation reporting require the corresponding contracts above.
-The I2 model gate still applies before package implementation starts.
+I2 remains partial until the required adapters and workloads are implemented.
