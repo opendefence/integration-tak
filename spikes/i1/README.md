@@ -19,8 +19,12 @@ podman run --rm --network none --cpus 2 --memory 4g \
 
 The probe must print `approved_set_requirement=FAIL` for the current binary.
 That result means the unapproved same-UUID certificate received the configured role and groups.
+The probe also calls the actual `SubmissionService.processContactMessage` method through reflection.
+It parses a CoT fixture and proves that `CLIENT-NEXT` replaces the contact name `DESIRED`.
+The fixture certificate and account permissions remain unchanged. No subscription exists in this fixture.
 See `docs/i1-findings.md` for the tested tuple and interpretation.
 
 This is a component probe.
-It does not start a live TAK server or prove TLS, CoT, restart, or client behavior.
+It does not start a live TAK server or prove TLS, network CoT delivery, restart, or client behavior.
+The private contact handler runs without server initialization, routing, or UID authentication.
 Keep it out of production images.

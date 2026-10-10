@@ -24,11 +24,13 @@ RESULT stored=tak-only presented=main status=SUCCESS role_readonly=true role_ano
 RESULT stored=tak-only presented=tak-only status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
 RESULT stored=tak-only presented=unapproved status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
 RESULT stored=tak-only presented=other-uuid status=SUCCESS role_readonly=false role_anonymous=true group_names=[__ANON__] group_entries=2
-RESULT contact_update=DESIRED leaf_unchanged=true account_unchanged=true permissions_unchanged=true subscriptions=0
+RESULT contact_update=DESIRED subscriptions=0
+RESULT next_cot_contact=CLIENT-NEXT desired_overwritten=true leaf_unchanged=true account_unchanged=true permissions_unchanged=true subscriptions=0
 RESULT approved_set_requirement=FAIL unapproved_same_uuid_received_role_and_groups
 
 Exit status: 0.
-The exact pinned JDK run reproduced the result twice after fixture repair.
+The earlier authentication/contact-map probe passed twice after fixture repair.
+The extended probe above passed once with the same pinned JDK and WAR.
 The experimental T1 server image contains the same tested WAR and UserManager.jar checksums.
 
 Interpretation:
@@ -36,9 +38,12 @@ Interpretation:
 - The unapproved same-UUID certificate receives ROLE_READONLY and both fixture group directions.
 - The different-UUID certificate receives only the binary's ROLE_ANONYMOUS and __ANON__ group fallback.
 - Updating the contact map changes the stored contact name without changing the fixture certificate, UUID account, role, or group list.
+- Calling SubmissionService.processContactMessage with parsed CoT replaces DESIRED with CLIENT-NEXT and the fixture endpoint.
+- The certificate, UUID account, role, and group list remain unchanged after this replacement.
 
 Limits:
 - This is an in-process component test against actual WAR classes.
-- It does not perform a TLS handshake, start the TAK services, exchange CoT, or test session resumption.
+- It invokes the private contact method through reflection without server initialization, routing, or UID authentication.
+- It does not perform a TLS handshake, start the TAK services, exchange CoT over a network, or test session resumption.
 - It does not prove a durable callsign change, live subscription update, peer display, restart, or approved-set enforcement.
 - Generated keys and certificates were not retained.

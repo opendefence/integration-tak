@@ -4,7 +4,7 @@ Date: 2026-10-10.
 Recipient: the next implementation agent or engineer.
 Repository: `opendefence/integration-tak`.
 Branch: `feat/i0-foundation`.
-Binary probe checkpoint: `67b94e2`.
+Initial binary probe checkpoint: `67b94e2`. Later probe evidence is in [the current checkpoint](implementation-status.md).
 
 The foundation and pure full-setup package builder are implemented.
 The operator and REST delivery service are not implemented.
@@ -65,6 +65,7 @@ The exact tested image digests and runtime versions are in the current checkpoin
 ## Binary probing and possible safety blocks
 
 The user reports Daybreak access.
+The latest user message says Daybreak Blue ran the earlier probing tests and confirms Astra / XHigh for this continuation.
 That access is user-provided context. It was not independently verified in this session.
 Do not assume it changes the active session's safety checks, tool permissions, or sandbox limits.
 A future execution environment may still block a probe despite that access.
@@ -79,6 +80,10 @@ The initial probe failure was a Java compilation error.
 It used invalid `Role.ROLE_USER` and `ConnectionType.STREAMING` enum names.
 Container `javap` inspection identified the exact 5.8.84 values.
 The repaired probe passed and saved sanitized evidence in `docs/evidence/i1-binary-probe.txt`.
+The extended contact-handler probe also passed during the Astra / XHigh continuation.
+It proves that parsed CoT can overwrite a contact-map rename while preserving the fixture certificate and permissions.
+Static lifecycle inspection confirms that peer-certificate metadata precedes completed TAK authentication.
+See `docs/evidence/i1-auth-lifecycle.txt`. A connection record alone is not sufficient successor activation evidence.
 Do not describe the initial compilation failure as a safety rejection.
 
 If a future safety or approval check blocks a probe:
@@ -111,7 +116,7 @@ Complete these checks against the agreed binary and deployment:
 - Prove through live TLS that approved main and TAK-only certificates authenticate to the same UUID account with the desired permissions.
 - Prove that a third CA-valid certificate with the same UUID, outside the approved set, is rejected before access is granted.
 - Verify roles and groups after writes, uncertain writes, restart, and reconciliation.
-- Test callsign updates across contact state, incoming CoT, reconnect, restart, live subscription, and peer display.
+- Extend the component callsign evidence to network CoT, reconnect, restart, live subscription, and peer display.
 - Bind any contact UID to authenticated connection evidence. Do not infer it from callsign or UUID.
 - Prove that a callsign edit preserves certificate material and permissions.
 - Prove exact successor observation on an established authenticated connection. Reject stale, unrelated, revoked, and superseded evidence.
@@ -211,6 +216,6 @@ Do not push, publish, or deploy without the session's authorization.
 
 For the next I2 session, first obtain the missing Core contracts and select the smallest agreed implementation slice.
 If those inputs remain unavailable, report the specific dependency and preserve this checkpoint.
-Binary component work is resumed and recorded at `67b94e2`.
+Binary component work resumed at `67b94e2`; the current checkpoint includes the contact-handler extension.
 Continue live binary work only against the agreed server mechanism and deployment tuple.
 If safety checks prevent probing, use the evidence procedure above and retain all affected release blockers.

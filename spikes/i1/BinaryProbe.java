@@ -22,13 +22,16 @@ import com.bbn.marti.remote.groups.Direction;
 import com.bbn.marti.remote.util.SpringContextBeanForApi;
 import com.bbn.marti.remote.util.RemoteUtil;
 import com.bbn.marti.service.DistributedContactManager;
+import com.bbn.marti.service.SubmissionService;
 import com.bbn.marti.service.SubscriptionStore;
 import com.bbn.marti.util.MessagingDependencyInjectionProxy;
 import com.bbn.marti.xml.bindings.Role;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
+import org.dom4j.DocumentHelper;
 import org.springframework.context.support.GenericApplicationContext;
+import tak.server.cot.CotEventContainer;
 import tak.server.ignite.IgniteConfigurationHolder;
 import tak.server.ignite.IgniteHolder;
 
@@ -131,11 +134,30 @@ public class BinaryProbe {
             manager.updateContact(renamed);
             check(manager.getCallsignFromUid("fixture-cot-uid").equals("DESIRED"), "contact update failed");
             check(contacts.getViewOfConnectionSubMap().isEmpty(), "contact update created a subscription");
+            System.out.println("RESULT contact_update=DESIRED subscriptions=0");
+            // Invoke only the contact handler; no server lifecycle or message routing runs here.
+            var submission = new SubmissionService(null, null, null, null, groupManager, null, null,
+                null, null, null, ignite, null, contacts, null, manager, null, null, null,
+                RemoteUtil.getInstance(), null, null, null);
+            var processContact = SubmissionService.class.getDeclaredMethod("processContactMessage", CotEventContainer.class);
+            processContact.setAccessible(true);
+            var cot = new CotEventContainer(DocumentHelper.parseText("""
+                <event version="2.0" uid="fixture-cot-uid" type="a-f-G-U-C" how="m-g"
+                    time="2026-10-10T00:00:00Z" start="2026-10-10T00:00:00Z" stale="2026-10-10T00:01:00Z">
+                  <point lat="0" lon="0" hae="0" ce="9999999" le="9999999"/>
+                  <detail><contact callsign="CLIENT-NEXT" endpoint="127.0.0.1:4242:tcp"/></detail>
+                </event>
+                """));
+            processContact.invoke(submission, cot);
+            check(manager.getCallsignFromUid("fixture-cot-uid").equals("CLIENT-NEXT"), "CoT did not replace contact name");
+            check(contacts.getContactByContactUid("fixture-cot-uid").getEndpoint().equals("127.0.0.1:4242:tcp"),
+                "CoT endpoint did not reach the contact store");
+            check(contacts.getViewOfConnectionSubMap().isEmpty(), "contact handler created a subscription");
             check(Arrays.equals(before, certificate("main").getEncoded()), "leaf changed");
             check(fileAuth.getAllUsers().size() == 1 && registration.getIdentifier().equals(UUID), "account changed");
             check(registration.getRole() == Role.ROLE_READONLY && registration.getGroupList().equals(List.of("fixture")),
                 "permissions changed");
-            System.out.println("RESULT contact_update=DESIRED leaf_unchanged=true account_unchanged=true permissions_unchanged=true subscriptions=0");
+            System.out.println("RESULT next_cot_contact=CLIENT-NEXT desired_overwritten=true leaf_unchanged=true account_unchanged=true permissions_unchanged=true subscriptions=0");
             System.out.println("RESULT approved_set_requirement=FAIL unapproved_same_uuid_received_role_and_groups");
             // The disposable container must not wait for TAK's process-wide executor shutdown hooks.
             Runtime.getRuntime().halt(0);

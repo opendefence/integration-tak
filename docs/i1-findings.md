@@ -6,6 +6,8 @@ I1 is incomplete.
 The user confirmed `gpt-6-astra` / `xhigh` with "Switched; resume I1".
 The host cannot verify the active model metadata.
 The user resumed binary probing and confirmed the I1 gate on 2026-10-10.
+The latest user message confirms Astra / XHigh and reports that Daybreak Blue ran the earlier probing tests.
+This is user-reported provenance. The host cannot verify either runtime setting.
 The 5.8.84 component probe now compiles and passes its assertions.
 It proves that the current binary fails the strict approved-set requirement.
 No production authentication, Core adapter, or server deployment has changed.
@@ -121,7 +123,7 @@ The guard decision remains open; no decision to omit it has been made.
 | --- | --- | --- |
 | Package preferences | The pure full-setup builder emits the current desired callsign where the client format is known | Real client import and override behavior remain untested. |
 | Contact table | The component probe changed `CLIENT` to `DESIRED` through `DistributedContactManager.updateContact` | The actual binary can replace the contact record by UID in process. Live remote execution is untested. |
-| Next CoT contact | `SubmissionService.processContactMessage` constructs a new contact from the received callsign, endpoint, and UID, then calls `updateContact` | A contact-table change is not evidence of a durable client rename. |
+| Next CoT contact | The extended component probe calls `SubmissionService.processContactMessage` with parsed CoT. It replaces `DESIRED` with `CLIENT-NEXT` and the fixture endpoint | Incoming contact data can overwrite the desired name. Network delivery remains untested. |
 | Live subscription | No update established by the inspected contact method | Do not advertise immediate subscription rename. |
 | Peer display | Not tested | Do not advertise immediate peer rename. |
 | Reconnect and restart | Not tested | Keep the acceptance checks open. |
@@ -131,7 +133,9 @@ A preferences-only update still needs package and client validation.
 Do not emit `disablePreferenceItem_locationCallsign=true`.
 Do not infer the CoT UID from a UUID or callsign.
 Bind it to the authenticated connection before any contact mutation.
-The component probe preserved the fixture certificate bytes, UUID account, role, and group list during a contact-map edit.
+The component probe preserved the fixture certificate bytes, UUID account, role, and group list after the edit and CoT overwrite.
+It invokes the private contact handler through reflection, without server initialization, routing, or UID authentication.
+The fixture has no subscription. It does not prove preservation of an existing subscription.
 This does not prove durable client or peer presentation behavior.
 
 ## Rotation evidence
@@ -139,7 +143,15 @@ This does not prove durable client or peer presentation behavior.
 The actual remote `ConnectionInfo` class contains the peer certificate and connection ID.
 That makes it a candidate input for exact-fingerprint observation.
 Presence of a certificate in this object does not prove completed authentication.
+Container bytecode inspection now establishes the ordering for the Netty TLS path.
+After TLS success, the handler creates `ConnectionInfo` and copies the peer leaf before it creates the authentication codec.
+The codec starts with `AuthStatus.NEW`.
+`X509AuthCodec.onConnect` calls `doTlsAuth`, which stores the result from `X509Authenticator.authenticate`.
+This path does not require a CoT application message to call the authenticator.
+The serialized `ConnectionInfo` has no authentication status; its handler reference is transient.
+See [the static lifecycle trace](evidence/i1-auth-lifecycle.txt) for exact classes and bytecode offsets.
 The observer must use established, authenticated connection evidence.
+Do not approve an observer that treats a peer certificate or subscription record alone as activation evidence.
 Its Core status writer, replay rules, and persistence contract remain open.
 
 Core owns predecessor revocation for both credential purposes.
@@ -155,6 +167,8 @@ Temporary evidence is under `/private/tmp/integration-tak-i1/`:
 - `5.8.84/`: extracted artifacts, unpacked WAR, and `javap -p -c` output.
 - `probe.log`: the original certificate checks and compilation failure.
 - `probe-final.log` and `probe-pinned.log`: successful repaired runs with raw process logs.
+- `probe-contact.log`: successful extended contact-handler probe with the same pinned runtime.
+- `auth-lifecycle-javap.txt` and `handshake-javap.txt`: static connection/authentication lifecycle inspection.
 - `shared-redesign.html` and `shared-core.html`: fetched public conversations.
 - `shared-*-messages.txt`: extracted text used for the source review.
 

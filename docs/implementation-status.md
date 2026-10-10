@@ -15,12 +15,14 @@ The integration is not release-ready.
 | I2 | `gpt-6.1-sol` / `high` | User: "Switched; resume I2" |
 
 The session cannot verify model runtime metadata or switch the active model.
+The latest user message explicitly confirms Astra / XHigh for this continuation.
+The user reports that Daybreak Blue ran the earlier probing tests. That provenance is not independently verified.
 I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
 
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `67b94e2`.
+- Implementation HEAD before this checkpoint: `d525978`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe).
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives).
@@ -87,8 +89,17 @@ Main, TAK-only, and unapproved same-UUID certificates all received `ROLE_READONL
 The result was identical with either approved fixture fingerprint stored.
 A different UUID received only the anonymous fallback.
 The contact-map update preserved the fixture certificate, account, role, and group list.
+The extended probe passed once with the same pinned WAR and JDK.
+The actual contact handler replaced `DESIRED` with the parsed CoT callsign `CLIENT-NEXT`.
+Certificate bytes and account permissions remained unchanged. The fixture has no subscriptions.
 See `evidence/i1-binary-probe.txt`.
-Live TLS, CoT, rotation, restart, session resumption, and client compatibility remain unchecked.
+Static lifecycle inspection shows that `ConnectionInfo` receives the peer certificate before TAK authentication completes.
+It has no authentication-status field. `X509AuthCodec.onConnect` calls authentication without requiring CoT.
+See `evidence/i1-auth-lifecycle.txt`. Remote activation observation remains unproven.
+For this continuation, the saved `RESULT` lines match the raw probe output exactly.
+All applicable repository checks passed. Ponytail review found no defects in the probe and evidence changes.
+Python package tests were not rerun because this continuation changes no product Python code.
+Live TLS, network CoT, rotation, restart, session resumption, and client compatibility remain unchecked.
 
 ## Runtime tuple and owned resources
 
@@ -126,7 +137,7 @@ No fixture keys, certificates, or ZIPs were saved as evidence.
 ## Next action
 
 Use the [remaining work handoff](remaining-work-handoff.md) to resume implementation.
-It includes the user-reported Daybreak access and the procedure for possible binary-probe safety blocks.
+It records the user-reported Daybreak Blue probe execution and the remaining dependencies.
 
 Obtain the versioned Core contracts for credential inventory, approval, effective permissions,
 UserBinding ownership, namespace access, HTTP authority, and authenticated activation reporting.
