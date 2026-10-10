@@ -13,6 +13,10 @@ See [package construction](docs/packages.md) and [PKCS#12 export](docs/certifica
 
 ## Development
 
+Run `task up` with Task 3.53 or newer to start the local kind cluster and registries
+using the remote Taskfiles from `opendefence/base`. Task will ask you to
+trust the remote source on first use.
+
 Use Python 3.14 and uv.
 Run `uv sync --locked` to install the development environment without JNI.
 This fetches the pinned Core resource model package from the Nexus `pypilocal` index.
