@@ -219,7 +219,9 @@ Follow the original handoff's exact model gate protocol before each transition.
 
 Complete these external and operational checks:
 
-- Obtain the versioned server base and add only integration overlays here.
+- Promote the stack composition to a pinned server release once the sibling base and
+  strict authentication are accepted. The local `k8s/stack` composition already
+  includes the server base and this repo's operator ingress policy.
 - Test in a dedicated Kind context or assigned namespace. Preserve unrelated workloads and PVCs.
 - Test restart/recovery, pending revocation, current authorization, and grant invalidation after restore.
 - Verify AMD64 and ARM64 images and the configured GitHub/ARC workflows before enabling publication.

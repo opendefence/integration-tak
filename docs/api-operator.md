@@ -141,15 +141,27 @@ Implement these inputs when their versioned contracts are available:
 
 ## Kubernetes composition
 
-`kubectl kustomize k8s/integration` renders only integration workloads, scoped RBAC, the grant Secret and an internal Service.
+`kubectl kustomize k8s/integration` renders the integration workloads, scoped RBAC,
+the grant Secret and an internal Service. For an OpenDefence stack installation,
+`kubectl kustomize k8s/stack` also includes the TAK Server base from a sibling
+`../tak-server` checkout. This repository owns that composition and the operator's
+Ignite ingress policy; TAK Server owns the reusable StatefulSet, Services, PVC,
+bootstrap Job and server configuration.
 The API and operator use separate service accounts and Deployments.
 Both run without root, with a read-only root filesystem and a bounded temporary volume.
 The operator uses one replica and Recreate updates.
 API TCP probes establish process reachability only; they do not establish current user authorization or production TAK readiness.
 
-The manifest image tags are local test candidates. An installation overlay must pin accepted image digests and set the real public origin.
+Check out the versioned TAK Server repository beside this one. Provision the
+database and required identity/password Secrets in `integration-tak` as described
+in [its Kubernetes guide](../../tak-server/k8s/README.md). Create the namespace,
+apply `k8s/stack/schema` and wait for `tak-schema-5-8-84` to complete, then grant
+the runtime database role before applying `k8s/stack`. The schema Job is separate
+so the installer can require its success before starting server Pods.
+An installation overlay must pin accepted image digests, set the server address,
+database endpoint, storage class and real public origin. The checked-in image tags
+and settings are local candidates, not a deployable release.
 There is no public Ingress or assumed Core ForwardAuth/header configuration.
-Server workloads are not copied here. Compose the integration with the versioned server base when that release contract is available.
 The current server candidate stops startup in strict mode until its injection exists.
 Do not deploy this composition as a production authentication release.
 

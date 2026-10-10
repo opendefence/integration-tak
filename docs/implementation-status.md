@@ -5,6 +5,10 @@
 I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe is complete and proves an approved-set failure.
 I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
+The stack Kustomization composes the sibling TAK Server base with the integration
+workloads, and provides a separate schema migration entry point.
+`kubectl kustomize` rendered 22 unique stack resources and the namespaced schema
+Job using the current sibling checkout; no resources were applied to a cluster.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. The operator uses
 `lib-opendefence-core==0.2.1+261010` models from the user-supplied Nexus index.

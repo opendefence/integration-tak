@@ -4,6 +4,8 @@ This repository contains the `opendefence_integration_tak` project.
 The project contains a client package builder, seven delivery API routes, Secret-backed grants and a UserBinding operator.
 Production Core authorization and strict TAK projection adapters remain unavailable.
 See [API and operator](docs/api-operator.md) for entry points, behavior and exact remaining boundaries.
+The OpenDefence stack Kustomization at `k8s/stack` composes these workloads with
+the sibling `../tak-server/k8s/base` and creates the TAK Server Pod resources.
 See `docs/implementation-status.md` for stage gates and blockers.
 See [remaining work handoff](docs/remaining-work-handoff.md) to continue implementation, including possible binary-probe safety blocks.
 See [server change handoff](docs/tak-server-change-handoff.md) for server packaging, strict authentication, and release acceptance work.
