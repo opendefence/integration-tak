@@ -1,0 +1,15 @@
+version: "3"
+
+includes:
+  registries: https://github.com/opendefence/base.git//taskfiles/registries.yaml?ref=main
+  cluster: https://github.com/opendefence/base.git//taskfiles/cluster.yaml?ref=main
+
+tasks:
+  up:
+    desc: Start the registries and local development cluster
+    cmds:
+      - task: registries:up
+      - task: cluster:create
+      - task: registries:connect
+      - task: cluster:configure-mirrors
+      - task: cluster:document-local-registry

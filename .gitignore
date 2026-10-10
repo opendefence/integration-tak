@@ -1,5 +1,6 @@
 .idea/
 .venv/
+.task/
 .env
 __pycache__/
 *.py[cod]
