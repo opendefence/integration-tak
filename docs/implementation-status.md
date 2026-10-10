@@ -5,7 +5,7 @@
 I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe is complete and proves an approved-set failure.
 I2 has a completed pure package slice. The operator and seven REST operations are not implemented.
-Production Core adapters remain blocked on versioned contracts.
+Core CRD shapes and UserBinding ownership are supplied. Production authorization and credential adapters still need semantic contracts.
 The integration is not release-ready.
 
 | Gate | Required setting | Confirmation |
@@ -35,6 +35,7 @@ I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
 - OpenAPI input: `1.0.0-draft.5`; seven operations under `/integrations/tak/api/v1`.
 - Server handoff: `../tak-server/tak-server-implementation-handoff.md`.
 - Core handoff: `/Users/rambo/Downloads/rasenmaeher-core-architecture-handoff.md`, dated 2026-10-10.
+- Core CRDs: user-supplied `../opendefence_core_crds.yaml`, `platform.opendefence.fi/v1alpha1`; five CRDs plus Core RBAC. The snapshot hash and remaining semantic gaps are in [Core contracts](core-contracts.md).
 - Additional sources: both user-supplied shared conversations. See [I1 findings](i1-findings.md).
 - Missing file: `tak-package-audit-and-redesign-plan.md` revision 5. The conversation link does not supply the full file.
 - Open decisions: [Core contracts](core-contracts.md).
@@ -157,8 +158,9 @@ No fixture keys, certificates, or ZIPs were saved as evidence.
 Use the [remaining work handoff](remaining-work-handoff.md) to resume implementation.
 It records the user-reported Daybreak Blue probe execution and the remaining dependencies.
 
-Obtain the versioned Core contracts for credential inventory, approval, effective permissions,
-UserBinding ownership, namespace access, HTTP authority, and authenticated activation reporting.
+Use the supplied Core CRDs for resource shapes and integration-owned UserBindings.
+Obtain the remaining contracts for credential inventory, approval, effective permissions,
+binding readiness revisions, credential namespace access, HTTP authority, and authenticated activation reporting.
 Then implement the corresponding I2 adapters, operator, and seven REST operations.
 Obtain the missing redesign file and final server base contract.
 Keep credential-update delivery disabled until real client tests establish a supported method.

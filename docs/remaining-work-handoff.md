@@ -35,6 +35,8 @@ The two shared conversations are supporting sources, not a complete copy of that
 - [Core architecture discussion](https://chatgpt.com/share/6ac980bb-d5dc-83eb-82ab-31ae4dded1ee).
 
 The Core working handoff is at `/Users/rambo/Downloads/rasenmaeher-core-architecture-handoff.md`.
+The user supplied [Core CRDs](../../opendefence_core_crds.yaml) for `platform.opendefence.fi/v1alpha1`.
+See [Core contracts](core-contracts.md) for the snapshot hash, settled resource ownership, and remaining semantic gaps.
 The server handoff is at `../tak-server/tak-server-implementation-handoff.md`.
 Use the [consolidated server change handoff](tak-server-change-handoff.md) for the later single-Pod decision, adopted strict fingerprint extension, and all remaining server changes.
 Their local paths may be unavailable on another host.
@@ -145,6 +147,11 @@ A post-authentication disconnect does not prove rejection before the first CoT m
 
 ## Core contracts required for I2
 
+The supplied CRDs establish cluster-scoped User, Group, Role, and Invite resources and namespaced UserBindings.
+Integrations create their own bindings, refer to Users through `spec.userRef.name`, and write `Synced`; Core observes them.
+Resource shapes and binding ownership no longer need to be invented or recovered from the prototype.
+The schema does not supply a multi-generation credential inventory or durable activation interface.
+
 Obtain versioned contracts or shared conformance implementations for these boundaries:
 
 | Boundary | Required decision |
@@ -153,7 +160,7 @@ Obtain versioned contracts or shared conformance implementations for these bound
 | Effective permissions | Group ancestry, role union, revisions, freshness, and changes caused by group moves or role edits. |
 | Credential inventory | Approved generations, purpose, issuer/serial, SHA-256 fingerprint, validity, predecessor mapping, and superseded/compromised states. |
 | Issuance and export | Permission to reuse a main key, TAK-only issuance for client-held main keys, renewal approval, and restart recovery. |
-| Kubernetes ownership | Credential namespaces, permitted Secret readers, retention, UserBinding writers, observed revisions, and readiness. |
+| Kubernetes ownership | Credential namespaces, permitted Secret readers, retention, applied revisions, and current readiness. UserBinding scope and integration writers are supplied. |
 | HTTP authority | Verified mTLS identity, trusted headers, spoofed-header removal, authorization deadlines, and direct-service access controls. |
 | Activation reporting | Trusted writer, completed authentication evidence, exact purpose/generation, durable event identity, idempotency, and recovery scan. |
 
