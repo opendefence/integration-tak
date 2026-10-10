@@ -9,6 +9,10 @@ The stack Kustomization composes the sibling TAK Server integrated overlay with 
 integration workloads. Separate entry points render the schema and grants Jobs.
 `kubectl kustomize` rendered 21 unique stack resources and both namespaced Jobs
 using the current sibling checkout; no resources were applied to a cluster.
+The Zarf package has `local-dev` and `production` manifest flavors.
+Both flavors built as ARM64 archives and passed lint and manifest inspection.
+The package does not bundle images. Local Kind needs loaded images.
+Production needs reachable registry images and explicit deploy values.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. The operator uses
 `lib-opendefence-core==0.2.1+261010` models from the user-supplied Nexus index.
@@ -32,13 +36,14 @@ The completed I2 application slice and remaining adapters are described in [API 
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `3739c08`.
+- Implementation HEAD before this checkpoint: `1b9359d`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
 - Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
-- Current server plan: `c0a1b87`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. That server worktree also has active, uncommitted packaging work; preserve it.
+- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `b67961d`; it does not complete strict authentication.
 - Server packaging: `61a8273` adds the integrated overlay and Zarf inputs. The integrated overlay still uses legacy authentication.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives), `3739c08` (HTTP routes, grants and binding reconciliation).
+- Integration deployment commits: `a98e6a2` (server overlay), `1b9359d` (Zarf manifest package).
 - Binary probe: `spikes/i1/`; tracked and complete for the current 5.8.84 artifacts.
 - Supplied handoff and OpenAPI files remain untracked and unchanged.
 - Prototype tooling: `b332e527c7dedf5e3f0a972b792c7d697dcace6b`.
