@@ -1,0 +1,262 @@
+"""Serialized Core resource reconciliation, independent of HTTP delivery."""
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+import hashlib
+import json
+import logging
+import time
+from typing import Protocol
+
+from cloudcoil.apimachinery import ObjectMeta, OwnerReference
+from cloudcoil.client import APIClient
+from cloudcoil.errors import APIError, ResourceConflict, ResourceNotFound
+import httpx
+
+from opendefence_integration_tak.cluster import cluster_config
+
+from opendefence_integration_tak.resources import (
+    BindingSpec,
+    BindingStatus,
+    Condition,
+    Group,
+    Reference,
+    Role,
+    User,
+    UserBinding,
+)
+
+_LABEL = "app.kubernetes.io/managed-by"
+_MANAGER = "opendefence-integration-tak"
+_REVISION = "integration.opendefence.fi/input-revision"
+_USER_UID = "integration.opendefence.fi/user-uid"
+_APPLIED_REVISION = "integration.opendefence.fi/applied-revision"
+_VALID_UNTIL = "integration.opendefence.fi/valid-until"
+_LOGGER = logging.getLogger(__name__)
+
+
+class ProjectionUnavailable(Exception):
+    """No fresh Core policy or verified strict server capability."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionReceipt:
+    input_revision: str
+    desired_revision: str
+    messaging_revision: str
+    api_revision: str
+    valid_until: datetime
+
+    def current(self, revision: str, now: datetime) -> bool:
+        return bool(self.desired_revision) and (
+            self.input_revision == revision
+            and self.desired_revision == self.messaging_revision == self.api_revision
+            and self.valid_until.tzinfo is not None
+            and self.valid_until > now
+        )
+
+
+class Projector(Protocol):
+    def reconcile(self, user: User, groups: list[Group], roles: list[Role], revision: str) -> ProjectionReceipt:
+        """Apply the full approved set and permissions; read back uncertain writes.
+
+        Implementations own one JVM in this process and return Python values only.
+        A receipt requires verified messaging AND API enforcement. Never synthesize
+        it from file-auth or scalar registerCert results.
+        """
+        ...
+
+
+class UnavailableProjector:
+    def reconcile(self, user: User, groups: list[Group], roles: list[Role], revision: str) -> ProjectionReceipt:
+        raise ProjectionUnavailable
+
+
+def input_revision(user: User, groups: list[Group], roles: list[Role]) -> str:
+    def identity(resource: User | Group | Role) -> dict[str, object]:
+        if resource.metadata is None or not resource.metadata.uid or not resource.name:
+            raise ValueError("Core resource identity is missing")
+        return {
+            "name": resource.name,
+            "uid": resource.metadata.uid,
+            "deletingAt": resource.metadata.deletion_timestamp.model_dump(mode="json")
+            if resource.metadata.deletion_timestamp
+            else None,
+            "spec": resource.spec.model_dump(mode="json", by_alias=True),
+        }
+
+    user_value = identity(user)
+    empty_status: dict[str, object] = {}
+    user_value["status"] = (
+        user.status.model_dump(mode="json", exclude={"bindings", "conditions", "observedGeneration"})
+        if user.status
+        else empty_status
+    )
+    value = {
+        "user": user_value,
+        "groups": [identity(item) for item in sorted(groups, key=lambda item: item.name or "")],
+        "roles": [identity(item) for item in sorted(roles, key=lambda item: item.name or "")],
+    }
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def binding_name(user: User) -> str:
+    if user.metadata is None or not user.metadata.uid:
+        raise ValueError("Core User UID is missing")
+    return "tak-" + hashlib.sha256(user.metadata.uid.encode()).hexdigest()[:32]
+
+
+def set_condition(binding: UserBinding, synced: bool, reason: str, now: datetime) -> bool:
+    generation = binding.metadata.generation if binding.metadata else None
+    status = binding.status or BindingStatus()
+    current = next((item for item in status.conditions if item.type == "Synced"), None)
+    desired = "True" if synced else "False"
+    condition = Condition(
+        type="Synced",
+        status=desired,
+        reason=reason,
+        message=reason,
+        lastTransitionTime=current.last_transition_time if current and current.status == desired else now,
+        observedGeneration=generation,
+    )
+    replacement = [item for item in status.conditions if item.type != "Synced"] + [condition]
+    changed = replacement != status.conditions or status.observed_generation != generation
+    status.conditions = replacement
+    status.observed_generation = generation
+    binding.status = status
+    return changed
+
+
+class BindingReconciler:
+    def __init__(
+        self,
+        users: APIClient[User],
+        groups: APIClient[Group],
+        roles: APIClient[Role],
+        bindings: APIClient[UserBinding],
+        projector: Projector,
+    ) -> None:
+        self.users, self.groups, self.roles, self.bindings = users, groups, roles, bindings
+        self.namespace, self.projector = bindings.default_namespace, projector
+
+    def _binding(self, user: User) -> UserBinding:
+        if user.metadata is None or not user.metadata.uid or not user.name:
+            raise ValueError("Core User identity is missing")
+        try:
+            binding = self.bindings.get(binding_name(user), self.namespace)
+        except ResourceNotFound:
+            binding = self.bindings.create(
+                UserBinding(
+                    metadata=ObjectMeta(
+                        name=binding_name(user),
+                        namespace=self.namespace,
+                        labels={_LABEL: _MANAGER},
+                        owner_references=[
+                            OwnerReference(
+                                api_version=user.api_version,
+                                kind="User",
+                                name=user.name,
+                                uid=user.metadata.uid,
+                                controller=True,
+                            )
+                        ],
+                    ),
+                    spec=BindingSpec(userRef=Reference(name=user.name)),
+                )
+            )
+        owners = binding.metadata.owner_references if binding.metadata else None
+        if (
+            binding.spec.user_ref.name != user.name
+            or not owners
+            or not any(
+                owner.uid == user.metadata.uid
+                and owner.kind == "User"
+                and owner.api_version == user.api_version
+                and owner.name == user.name
+                for owner in owners
+            )
+            or not binding.metadata
+            or (binding.metadata.labels or {}).get(_LABEL) != _MANAGER
+        ):
+            raise ValueError("Binding ownership conflict")
+        return binding
+
+    def _status(self, binding: UserBinding, synced: bool, reason: str) -> UserBinding:
+        if set_condition(binding, synced, reason, datetime.now(UTC)):
+            return self.bindings.update_status(binding)
+        return binding
+
+    def reconcile(self, user: User, groups: list[Group], roles: list[Role]) -> UserBinding:
+        revision = input_revision(user, groups, roles)
+        binding = self._binding(user)
+        if binding.metadata is None or user.metadata is None:
+            raise ValueError("Resource metadata is missing")
+        annotations = binding.metadata.annotations or {}
+        if annotations.get(_REVISION) != revision or annotations.get(_USER_UID) != user.metadata.uid:
+            # Clear readiness first; annotation publication alone cannot make stale status current.
+            binding = self._status(binding, False, "InputsChanged")
+            if binding.metadata is None:
+                raise ValueError("Binding metadata is missing")
+            binding.metadata.annotations = annotations | {_REVISION: revision, _USER_UID: user.metadata.uid or ""}
+            binding = self.bindings.update(binding)
+        try:
+            receipt = self.projector.reconcile(user, groups, roles, revision)
+        except ProjectionUnavailable:
+            return self._status(binding, False, "AuthorityUnavailable")
+        except Exception:
+            self._status(binding, False, "ProjectionFailed")
+            raise
+        if not receipt.current(revision, datetime.now(UTC)):
+            return self._status(binding, False, "ProjectionUnverified")
+        if user.name is None:
+            raise ValueError("Core User name is missing")
+        try:
+            fresh_user = self.users.get(user.name)
+            fresh_groups, fresh_roles = list(self.groups.list()), list(self.roles.list())
+        except APIError, httpx.RequestError:
+            self._status(binding, False, "AuthorityUnavailable")
+            raise
+        if input_revision(fresh_user, fresh_groups, fresh_roles) != revision:
+            return self._status(binding, False, "InputsChanged")
+        if binding.metadata is None:
+            raise ValueError("Binding metadata is missing")
+        annotations = binding.metadata.annotations or {}
+        applied = {_APPLIED_REVISION: receipt.desired_revision, _VALID_UNTIL: receipt.valid_until.isoformat()}
+        if any(annotations.get(key) != value for key, value in applied.items()):
+            binding.metadata.annotations = annotations | applied
+            binding = self.bindings.update(binding)
+        if not receipt.current(revision, datetime.now(UTC)):
+            return self._status(binding, False, "ProjectionUnverified")
+        return self._status(binding, True, "ProjectionVerified")
+
+    def run_once(self) -> None:
+        users = list(self.users.list())
+        groups, roles = list(self.groups.list()), list(self.roles.list())
+        for user in users:
+            try:
+                self.reconcile(user, groups, roles)
+            except ResourceConflict:
+                _LOGGER.warning("Binding conflict; retry on next scan")
+            except ValueError:
+                _LOGGER.error("Invalid Core identity or binding ownership; skipped this user")
+
+
+def run_operator(namespace: str) -> None:
+    """One serial scan for the small installation; no fork or JNI import here.
+
+    shortcut: poll every ten seconds; use informers if measured scale needs them.
+    """
+    with cluster_config(namespace=namespace) as config:
+        reconciler = BindingReconciler(
+            User.client(config),
+            Group.client(config),
+            Role.client(config),
+            UserBinding.client(config, namespace=namespace),
+            UnavailableProjector(),
+        )
+        while True:
+            try:
+                reconciler.run_once()
+            except APIError, httpx.RequestError, ValueError:
+                _LOGGER.error("Core scan failed; no projection is marked ready")
+            time.sleep(10)

@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration-tak-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integration-tak-api
+  template:
+    metadata:
+      labels:
+        app: integration-tak-api
+    spec:
+      serviceAccountName: integration-tak-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: localhost/opendefence-integration-tak-api:i2-http-operator
+          args: [api, --namespace, $(POD_NAMESPACE), --public-origin, $(PUBLIC_ORIGIN)]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: PUBLIC_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: integration-tak-settings
+                  key: public-origin
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "2"
+              memory: 512Mi
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+          readinessProbe:
+            tcpSocket:
+              port: http
+          startupProbe:
+            tcpSocket:
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+      volumes:
+        - name: temporary
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration-tak-operator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: integration-tak-operator
+  template:
+    metadata:
+      labels:
+        app: integration-tak-operator
+    spec:
+      serviceAccountName: integration-tak-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: localhost/opendefence-integration-tak-operator:i2-http-operator
+          args: [operator, --namespace, $(POD_NAMESPACE)]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: temporary
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: integration-tak-api
+spec:
+  selector:
+    app: integration-tak-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

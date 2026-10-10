@@ -7,7 +7,9 @@ Branch: `feat/i0-foundation`.
 Initial binary probe checkpoint: `67b94e2`. Later probe evidence is in [the current checkpoint](implementation-status.md).
 
 The foundation and pure full-setup package builder are implemented.
-The operator and REST delivery service are not implemented.
+The seven REST operations, Secret-backed grants and UserBinding reconciliation are implemented.
+Production Core authorization and strict TAK JNI adapters remain unavailable.
+See [API and operator](api-operator.md) for behavior and adapter contracts.
 I1 is incomplete. I2 is partial. The integration is not release-ready.
 Continue independent work when its inputs are available.
 The user resumed binary probing on 2026-10-10.
@@ -21,10 +23,10 @@ Read these files before changing code:
 3. [Core contract decisions](core-contracts.md).
 4. [I1 binary and static findings](i1-findings.md).
 5. [Package builder](packages.md) and [certificate export](certificates.md).
-6. [OpenAPI draft](../tak-package-api.openapi.json), version `1.0.0-draft.5`.
+6. [Tracked OpenAPI draft](package-api.openapi.json), version `1.0.0-draft.5`.
 
-The original handoff and OpenAPI draft are local, untracked inputs.
-Preserve them. A fresh clone needs separate copies.
+The original handoff and OpenAPI draft remain local, untracked inputs.
+Preserve them. The tracked OpenAPI copy supports tests in fresh clones.
 The tracked `spikes/i1/` component probe preserves the original failure context and repaired test.
 Do not include it in production images.
 
@@ -137,11 +139,11 @@ Its separate local worktree is `../tak-server-strict-fingerprint`; the original 
 Read `extensions/strict-fingerprint/README.md` there before continuing.
 The policy is tested in isolation. It does not enforce authentication in the shipped server.
 See `docs/evidence/i1-strict-policy.txt` for results and limits.
-Matching TAK 5.8.84 source remains missing. Its location was requested.
+The later server plan supersedes a matching-source prerequisite: changes use external launchers/runtime injection against unchanged pinned vendor artifacts.
 Public source at `5187abd46d827d37cfc5708805eced197a837e49` is based on 5.7.14 and is not a substitute.
-Connect the policy to the server schema, trusted management writer, and all supported certificate authentication paths.
+Connect the policy through versioned extension configuration, a trusted management writer, and all supported certificate authentication paths.
 Prove delivery to both messaging and API processes. Recheck cached HTTP identities and stop denied CoT before routing.
-Update its schema, management interface, implementation, and pinned JAR together.
+Version the extension configuration and management capability with the unchanged vendor runtime tuple.
 The optional disconnect guard decision remains open.
 A post-authentication disconnect does not prove rejection before the first CoT message.
 
@@ -176,17 +178,17 @@ After the corresponding contracts and server decisions are available:
 2. Implement the TAK projection operator. Use one JVM per process, serialized mutations, and readback after uncertain writes.
 3. Reconcile the full approved credential set, roles, groups, and callsign presentation without recreating the UUID account.
 4. Implement authenticated successor observation with an explicit process owner and persistent Core reporting.
-5. Implement all seven operations in the supplied OpenAPI draft under `/integrations/tak/api/v1`.
+5. Connect the seven implemented operations to production Core authority and verified TAK projection readback.
 6. Implement protected self-service routes and certificate-free token redemption with compatible TLS routing.
-7. Add Secret-backed reusable grants, exact generation/profile/variant binding, current authorization checks, expiry, and deletion.
-8. Add meaningful tests for denial, stale state, retryable failures, concurrency, and recovery.
+7. Verify the implemented Secret-backed grants against live Core authorization, ingress, replica races and the restore procedure.
+8. Extend the fixture-backed denial, freshness, retries, recovery and binding replacement tests with live acceptance evidence.
 
 GET requests must not create accounts, keys, or certificates.
 An admin role alone must not permit extraction of another user's key.
 Grants use a random public ID and a separate 256-bit token. Store only the token hash.
 Grants normally expire after five minutes, or sooner when authority or credentials expire.
 An old grant must not select a new credential generation.
-Use `201` and `Location` for ready grant creation, `409` for unavailable inputs, and retryable `503` for infrastructure failure.
+Use `201` and `Location` for ready grant creation, `409` for unsupported updates, and retryable `503` for unavailable authority, projection, material or infrastructure.
 Public invalid, expired, or revoked grants return a uniform `404`.
 Sensitive responses use `no-store`. Build links from a configured public origin.
 Do not log tokens or restore live grants from backups.
@@ -232,7 +234,7 @@ Consult the configured PyCharm Python environment before any Python toolchain co
 Use repository hooks and relevant tests. Save only sanitized evidence.
 Do not push, publish, or deploy without the session's authorization.
 
-For the next I2 session, first obtain the missing Core contracts and select the smallest agreed implementation slice.
+For the next I2 session, read the implemented application boundary in [API and operator](api-operator.md), then obtain the missing Core and server contracts for production adapters.
 If those inputs remain unavailable, report the specific dependency and preserve this checkpoint.
 Binary component work resumed at `67b94e2`; the current checkpoint includes the contact-handler extension.
 Continue live binary work only against the agreed server mechanism and deployment tuple.

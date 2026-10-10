@@ -4,7 +4,8 @@
 
 I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe is complete and proves an approved-set failure.
-I2 has a completed pure package slice. The operator and seven REST operations are not implemented.
+I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
+Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. Production authorization and credential adapters still need semantic contracts.
 The integration is not release-ready.
 
@@ -17,11 +18,10 @@ The integration is not release-ready.
 The session cannot verify model runtime metadata or switch the active model.
 The earlier I1 continuation explicitly confirmed Astra / XHigh.
 The user reports that Daybreak Blue ran the earlier probing tests. That provenance is not independently verified.
-I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
-The user requested REST API and Kubernetes operator implementation after the I1 continuation.
-The I2 transition requires a fresh `gpt-6.1-sol` / `high` confirmation or an explicit gate waiver.
-An unspecified continuation does not confirm that switch under the supplied handoff.
-Product implementation has not resumed. The latest verified checkpoint is `f04c1ef`.
+I2 is active after the user's fresh "Switched; resume I2" confirmation.
+That confirmation satisfies the transition required at `f8bed37`.
+I1 remains a release blocker; do not enter I3 yet.
+The completed I2 application slice and remaining adapters are described in [API and operator](api-operator.md).
 
 ## Checkpoint and sources
 
@@ -162,11 +162,11 @@ No fixture keys, certificates, or ZIPs were saved as evidence.
 
 ## Next action
 
-Resume product work after the required I2 model confirmation or an explicit waiver.
-Start with schema-based User/Group/Role readers and integration-owned UserBinding lifecycle, plus the seven REST operations in OpenAPI `1.0.0-draft.5`.
-Use the existing package builder. Keep the API JVM-free and the JNI bridge inside the operator process.
-Test unavailable authority, denial, exact credential selection, grants, stale applied state, retries, and binding replacement.
-Keep unresolved credential, HTTP authority, and server capability inputs explicit; do not invent Core resources or report fixture success as production readiness.
+Implement the production `Authority` and `Projector` adapters when versioned Core semantics and strict server capabilities are available.
+The seven routes, typed Core readers, binding lifecycle, bounded Secret store and separate CLI workloads are implemented.
+Their fixture-backed tests do not establish production authorization or server enforcement.
+Keep the API JVM-free and the JNI bridge inside the operator process.
+Add trusted ingress and server-base composition only against the supplied final contracts.
 
 Use the [remaining work handoff](remaining-work-handoff.md) to resume implementation.
 It records the user-reported Daybreak Blue probe execution and the remaining dependencies.

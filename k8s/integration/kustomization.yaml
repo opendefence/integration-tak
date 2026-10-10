@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: integration-tak
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - grants.yaml
+  - workloads.yaml
+configMapGenerator:
+  - name: integration-tak-settings
+    literals:
+      - public-origin=https://configure.invalid

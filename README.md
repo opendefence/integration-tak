@@ -1,8 +1,9 @@
 # OpenDefence TAK integration
 
 This repository contains the `opendefence_integration_tak` project.
-The project contains foundation tooling and a pure client package builder.
-The operator and delivery API are not implemented yet.
+The project contains a client package builder, seven delivery API routes, Secret-backed grants and a UserBinding operator.
+Production Core authorization and strict TAK projection adapters remain unavailable.
+See [API and operator](docs/api-operator.md) for entry points, behavior and exact remaining boundaries.
 See `docs/implementation-status.md` for stage gates and blockers.
 See [remaining work handoff](docs/remaining-work-handoff.md) to continue implementation, including possible binary-probe safety blocks.
 See [server change handoff](docs/tak-server-change-handoff.md) for server packaging, strict authentication, and release acceptance work.
@@ -36,8 +37,8 @@ The prototype's Core resource models and server deployments are not copied.
 
 ## Images
 
-Run `podman build --target api -t localhost/opendefence-integration-tak-api:i0 .` to build the API foundation.
-Run `podman build --target operator -t localhost/opendefence-integration-tak-operator:i0 .` to build the JNI foundation.
+Run `podman build --target api -t localhost/opendefence-integration-tak-api:i2-http-operator .` to build the API.
+Run `podman build --target operator -t localhost/opendefence-integration-tak-operator:i2-http-operator .` to build the operator runtime.
 Both images currently print help by default.
 Both images run as UID 10001.
 The API image contains no Java runtime or JNI dependency.
@@ -50,8 +51,8 @@ Run `podman run --rm localhost/opendefence-integration-tak-api:test` to test it.
 Use this command to check each runtime image:
 
 ```sh
-podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-api:i0 - api < docker/check_runtime.py
-podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-operator:i0 - operator < docker/check_runtime.py
+podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-api:i2-http-operator - api < docker/check_runtime.py
+podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-operator:i2-http-operator - operator < docker/check_runtime.py
 ```
 
 The operator check starts one JVM and calls a class from the actual JAR.

@@ -42,8 +42,10 @@ def _is_ca(certificate: x509.Certificate) -> bool:
         return False
 
 
-def client_keystore(credential: ClientCredential, *, now: datetime) -> bytes:
-    """Export one key and its leaf-first chain. Do not issue or approve credentials."""
+def validate_client_credential(
+    credential: ClientCredential, *, now: datetime
+) -> tuple[rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey, list[x509.Certificate]]:
+    """Check export inputs without PKCS#12 encryption; return parsed key and chain."""
     if now.utcoffset() is None:
         raise ValueError("An aware verification time is required")
     password = credential.password
@@ -69,22 +71,34 @@ def client_keystore(credential: ClientCredential, *, now: datetime) -> bytes:
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
     ) != leaf.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo):
         raise ValueError("Client private key does not match the certificate")
+    return key, certificates
+
+
+def client_keystore(credential: ClientCredential, *, now: datetime) -> bytes:
+    """Export one key and its leaf-first chain. Do not issue or approve credentials."""
+    key, certificates = validate_client_credential(credential, now=now)
     # The public truststore's legacy encryption must never protect the client key.
     encryption = (
         serialization.PrivateFormat.PKCS12.encryption_builder()
         .kdf_rounds(600_000)
         .key_cert_algorithm(pkcs12.PBES.PBESv2SHA256AndAES256CBC)
         .hmac_hash(hashes.SHA256())
-        .build(password.encode("ascii"))
+        .build(credential.password.encode("ascii"))
     )
-    return pkcs12.serialize_key_and_certificates(b"client", key, leaf, certificates[1:], encryption)
+    return pkcs12.serialize_key_and_certificates(b"client", key, certificates[0], certificates[1:], encryption)
+
+
+def validate_ca_bundle(pem_bundle: bytes) -> dict[bytes, x509.Certificate]:
+    """Check a bounded CA bundle without producing a truststore."""
+    unique = {cert.fingerprint(hashes.SHA256()): cert for cert in _certificates(pem_bundle) if _is_ca(cert)}
+    if not unique:
+        raise ValueError("Trust bundle contains no CA certificates")
+    return unique
 
 
 def ca_truststore(pem_bundle: bytes) -> bytes:
     """Export unique CA certificates as Java trustedCertEntry values."""
-    unique = {cert.fingerprint(hashes.SHA256()): cert for cert in _certificates(pem_bundle) if _is_ca(cert)}
-    if not unique:
-        raise ValueError("Trust bundle contains no CA certificates")
+    unique = validate_ca_bundle(pem_bundle)
     entries = [
         pkcs12.PKCS12Certificate(cert, f"cert-{fingerprint.hex()}".encode("ascii"))
         for fingerprint, cert in unique.items()

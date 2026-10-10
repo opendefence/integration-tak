@@ -13,10 +13,13 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_LINK_MODE=copy
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 RUN uv sync --locked --no-dev --no-editable
 
 FROM build AS api-test
 COPY tests ./tests
+COPY docs/package-api.openapi.json ./docs/package-api.openapi.json
 RUN uv sync --locked --no-editable
 CMD ["/opt/venv/bin/python", "-m", "pytest"]
 
@@ -28,7 +31,7 @@ CMD ["/opt/venv/bin/python", "-m", "pytest", "--require-keytool"]
 FROM build AS operator-build
 COPY --from=jdk /opt/java/openjdk /opt/java/openjdk
 ENV JAVA_HOME=/opt/java/openjdk PATH="/opt/java/openjdk/bin:$PATH"
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev git \
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN uv sync --locked --no-dev --no-editable --extra operator
 

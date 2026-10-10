@@ -12,7 +12,9 @@ dist
 build
 htmlcov
 pytest*.xml
-docs
+docs/*
+!docs/package-api.openapi.json
+k8s
 spikes
 integration-tak-implementation-handoff.md
 tak-package-api.openapi.json

@@ -43,7 +43,8 @@ class RenderedPackage:
     content: bytes = field(repr=False)
 
 
-def _validate_settings(settings: PackageSettings) -> None:
+def validate_settings(settings: PackageSettings) -> None:
+    """Check connection and presentation inputs without constructing an archive."""
     if _SLUG.fullmatch(settings.deployment_id) is None:
         raise ValueError("Deployment ID must be a lowercase DNS label")
     if not isinstance(settings.user_id, UUID):
@@ -111,7 +112,7 @@ def build_package(
     """Render full setup only. Authorization and approval remain the caller's responsibility."""
     if profile_id not in PROFILE_IDS:
         raise ValueError("Unknown package profile")
-    _validate_settings(settings)
+    validate_settings(settings)
     # Accept the draft's UUID forms without choosing Core's persistence or CN encoding.
     try:
         credential_id = UUID(credential.expected_cn)
