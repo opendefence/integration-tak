@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization import pkcs12
 import pytest
 
-from odintegration_tak.certificates import (
+from opendefence_integration_tak.certificates import (
     MAX_CERTIFICATES,
     MAX_KEY_BYTES,
     MAX_PEM_BYTES,

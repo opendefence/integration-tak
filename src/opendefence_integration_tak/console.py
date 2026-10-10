@@ -2,7 +2,7 @@
 
 import argparse
 
-from odintegration_tak import __version__
+from opendefence_integration_tak import __version__
 
 
 def main() -> None:

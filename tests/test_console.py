@@ -6,7 +6,7 @@ from importlib.metadata import version
 
 import pytest
 
-from odintegration_tak import __version__
+from opendefence_integration_tak import __version__
 
 
 @pytest.mark.parametrize("arguments", [[], ["--help"], ["--version"]])
@@ -21,11 +21,11 @@ class RejectJava(importlib.abc.MetaPathFinder):
             raise AssertionError('CLI attempted to load Java')
 
 sys.meta_path.insert(0, RejectJava())
-import odintegration_tak
-import odintegration_tak.certificates
-import odintegration_tak.packages
+import opendefence_integration_tak
+import opendefence_integration_tak.certificates
+import opendefence_integration_tak.packages
 import runpy
-runpy.run_module('odintegration_tak', run_name='__main__')
+runpy.run_module('opendefence_integration_tak', run_name='__main__')
 """
     result = subprocess.run(
         [sys.executable, "-c", script, *arguments], capture_output=True, text=True, timeout=10, check=True
@@ -36,4 +36,4 @@ runpy.run_module('odintegration_tak', run_name='__main__')
 
 
 def test_distribution_version() -> None:
-    assert version("odintegration_tak") == __version__
+    assert version("opendefence_integration_tak") == __version__

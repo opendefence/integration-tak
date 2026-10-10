@@ -12,7 +12,12 @@ from uuid import UUID, uuid4
 from xml.etree import ElementTree as ET  # nosec B405
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from odintegration_tak.certificates import ClientCredential, TRUSTSTORE_PASSWORD, ca_truststore, client_keystore
+from opendefence_integration_tak.certificates import (
+    ClientCredential,
+    TRUSTSTORE_PASSWORD,
+    ca_truststore,
+    client_keystore,
+)
 
 PROFILE_IDS = ("atak", "atak-mini", "itak", "wintak", "tak-tracker")
 _SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")

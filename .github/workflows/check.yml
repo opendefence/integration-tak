@@ -46,19 +46,19 @@ jobs:
       - uses: actions/checkout@v7
       - name: Test the API environment
         run: |
-          docker build --target api-test -t odintegration-tak:api-test .
-          docker run --rm odintegration-tak:api-test
+          docker build --target api-test -t opendefence-integration-tak:api-test .
+          docker run --rm opendefence-integration-tak:api-test
       - name: Test Java package compatibility
         run: |
-          docker build --target package-test -t odintegration-tak:package-test .
-          docker run --rm odintegration-tak:package-test
+          docker build --target package-test -t opendefence-integration-tak:package-test .
+          docker run --rm opendefence-integration-tak:package-test
       - name: Verify separate runtimes
         run: |
           for runtime in api operator; do
-            docker build --target "$runtime" -t "odintegration-tak:$runtime" .
-            docker run --rm "odintegration-tak:$runtime" --help
-            docker run --rm "odintegration-tak:$runtime" --version
-            docker run --rm -i --entrypoint python "odintegration-tak:$runtime" - "$runtime" < docker/check_runtime.py
+            docker build --target "$runtime" -t "opendefence-integration-tak:$runtime" .
+            docker run --rm "opendefence-integration-tak:$runtime" --help
+            docker run --rm "opendefence-integration-tak:$runtime" --version
+            docker run --rm -i --entrypoint python "opendefence-integration-tak:$runtime" - "$runtime" < docker/check_runtime.py
           done
 
   snyk:

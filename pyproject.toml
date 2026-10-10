@@ -1,5 +1,5 @@
 [project]
-name = "odintegration_tak"
+name = "opendefence_integration_tak"
 version = "0.1.0"
 description = "OpenDefence TAK integration"
 readme = "README.md"
@@ -20,7 +20,7 @@ operator = ["cloudcoil[kubernetes,operator]", "pyjnius==1.7.0"]
 cloudcoil = { git = "https://github.com/cloudcoil/cloudcoil.git", tag = "0.8.0" }
 
 [project.scripts]
-odintegration-tak = "odintegration_tak.console:main"
+opendefence-integration-tak = "opendefence_integration_tak.console:main"
 
 [dependency-groups]
 dev = [
@@ -50,7 +50,7 @@ search-path = ["src", "."]
 python-version = "3.14"
 
 [tool.pytest.ini_options]
-addopts = "--cov=odintegration_tak --cov-fail-under=90 --cov-branch"
+addopts = "--cov=opendefence_integration_tak --cov-fail-under=90 --cov-branch"
 junit_family = "xunit2"
 
 [tool.coverage.run]
@@ -63,4 +63,4 @@ requires = ["hatchling>=1.32.0,<2.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/odintegration_tak"]
+packages = ["src/opendefence_integration_tak"]

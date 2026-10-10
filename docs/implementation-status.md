@@ -55,6 +55,16 @@ I1 also used investigate-first to separate static evidence from runtime proof.
 
 ## Decisions and verification
 
+The user renamed the Python distribution/import package to `opendefence_integration_tak`.
+The CLI is `opendefence-integration-tak`.
+These names supersede the supplied handoff and OpenAPI draft's earlier names.
+Historical image tags and saved evidence below retain the names used in those runs.
+Rename verification passed: 114 local tests with two Java checks skipped; all 116 tests in the Java container, with 100% coverage.
+The wheel/source build, wheel contents, new CLI/module help and version, and all repository checks passed.
+Both renamed ARM64 runtime images passed help/version and `docker/check_runtime.py`, including the native operator JNI call.
+The old import and CLI were absent after `uv sync --locked`. No compatibility aliases were added.
+Hosted CI and AMD64 were not rerun for the rename.
+
 Keep JNI dependencies in the operator extra. Keep PyJNIus pinned to `1.7.0`.
 The images print help by default. Neither workload is enabled yet.
 Publishing and Snyk remain disabled until their repository variables enable them.

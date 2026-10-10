@@ -538,7 +538,7 @@ wheels = [
 ]
 
 [[package]]
-name = "odintegration-tak"
+name = "opendefence-integration-tak"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

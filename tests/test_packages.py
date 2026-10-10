@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import pkcs12
 import pytest
 
-from odintegration_tak.packages import PROFILE_IDS, PackageSettings, build_package
+from opendefence_integration_tak.packages import PROFILE_IDS, PackageSettings, build_package
 from tests.conftest import CredentialFixture
 
 SETTINGS = PackageSettings("alpha", UUID("00000000-0000-4000-8000-000000000001"), "tak.example.test", 'Fox & <"ä">')

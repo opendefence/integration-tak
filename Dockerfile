@@ -38,7 +38,7 @@ RUN /usr/local/bin/python -m pip uninstall -y pip
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
 USER 10001:10001
-ENTRYPOINT ["odintegration-tak"]
+ENTRYPOINT ["opendefence-integration-tak"]
 CMD ["--help"]
 
 FROM runtime AS api

@@ -1,6 +1,6 @@
 # Client package construction
 
-`odintegration_tak.packages.build_package` builds an in-memory full-setup ZIP.
+`opendefence_integration_tak.packages.build_package` builds an in-memory full-setup ZIP.
 It requires explicit connection settings, one existing exportable credential, the trust PEM bundle, and an aware verification time.
 It does not read Kubernetes, start Java, write files, or provision resources.
 Core authorization and verified TAK acceptance remain the caller's responsibility.

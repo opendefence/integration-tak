@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import NameOID
 import pytest
 
-from odintegration_tak.certificates import ClientCredential
+from opendefence_integration_tak.certificates import ClientCredential
 
 
 @dataclass(frozen=True)

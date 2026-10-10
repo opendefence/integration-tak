@@ -1,6 +1,6 @@
 # OpenDefence TAK integration
 
-This repository contains the `odintegration_tak` project.
+This repository contains the `opendefence_integration_tak` project.
 The project contains foundation tooling and a pure client package builder.
 The operator and delivery API are not implemented yet.
 See `docs/implementation-status.md` for stage gates and blockers.
@@ -17,7 +17,7 @@ Run `uv run --locked prek run --all-files` to check the files.
 Run `uv run --locked pytest` to test the package.
 Run the separate `package-test` image to require Java compatibility checks.
 Run `uv build --no-sources` to build the distributions.
-Run `uv run --locked odintegration-tak --help` to inspect the CLI.
+Run `uv run --locked opendefence-integration-tak --help` to inspect the CLI.
 
 Install the operator extra only in an environment with Java 17 and JNI headers.
 Use `uv sync --locked --extra operator` in that environment.
@@ -36,8 +36,8 @@ The prototype's Core resource models and server deployments are not copied.
 
 ## Images
 
-Run `podman build --target api -t localhost/odintegration-tak-api:i0 .` to build the API foundation.
-Run `podman build --target operator -t localhost/odintegration-tak-operator:i0 .` to build the JNI foundation.
+Run `podman build --target api -t localhost/opendefence-integration-tak-api:i0 .` to build the API foundation.
+Run `podman build --target operator -t localhost/opendefence-integration-tak-operator:i0 .` to build the JNI foundation.
 Both images currently print help by default.
 Both images run as UID 10001.
 The API image contains no Java runtime or JNI dependency.
@@ -45,13 +45,13 @@ The operator image contains Java 17 and the pinned prototype `UserManager.jar`.
 This JAR is an I0 test input, not the final server compatibility contract.
 The server project must provide the agreed image digest and JAR checksum before I1 can finish.
 
-Run `podman build --target api-test -t localhost/odintegration-tak-api:test .` to build the container test environment.
-Run `podman run --rm localhost/odintegration-tak-api:test` to test it.
+Run `podman build --target api-test -t localhost/opendefence-integration-tak-api:test .` to build the container test environment.
+Run `podman run --rm localhost/opendefence-integration-tak-api:test` to test it.
 Use this command to check each runtime image:
 
 ```sh
-podman run --rm -i --entrypoint python localhost/odintegration-tak-api:i0 - api < docker/check_runtime.py
-podman run --rm -i --entrypoint python localhost/odintegration-tak-operator:i0 - operator < docker/check_runtime.py
+podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-api:i0 - api < docker/check_runtime.py
+podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-operator:i0 - operator < docker/check_runtime.py
 ```
 
 The operator check starts one JVM and calls a class from the actual JAR.

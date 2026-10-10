@@ -1,6 +1,6 @@
 # PKCS#12 export
 
-`odintegration_tak.certificates` exports existing material.
+`opendefence_integration_tak.certificates` exports existing material.
 It does not generate keys, issue certificates, or approve access.
 The authoritative adapter must supply the expected certificate CN and an explicit verification time.
 The exporter requires a matching RSA or EC private key and a currently valid leaf.
@@ -35,8 +35,8 @@ The Java check is skipped in this command unless `--require-keytool` is supplied
 Run these commands for the mandatory Java 17 checks:
 
 ```sh
-podman build --target package-test -t localhost/odintegration-tak-package:test .
-podman run --rm localhost/odintegration-tak-package:test
+podman build --target package-test -t localhost/opendefence-integration-tak-package:test .
+podman run --rm localhost/opendefence-integration-tak-package:test
 ```
 
 The separate test image contains the pinned JDK.
