@@ -22,9 +22,10 @@ I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `d525978`.
+- Implementation HEAD before this checkpoint: `27c7b97`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
-- I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe).
+- I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
+- Server policy: `7f1e42c` on `feat/strict-fingerprint`, in separate worktree `../tak-server-strict-fingerprint`.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives).
 - Binary probe: `spikes/i1/`; tracked and complete for the current 5.8.84 artifacts.
 - Supplied handoff and OpenAPI files remain untracked and unchanged.
@@ -101,6 +102,13 @@ All applicable repository checks passed. Ponytail review found no defects in the
 Python package tests were not rerun because this continuation changes no product Python code.
 Live TLS, network CoT, rotation, restart, session resumption, and client compatibility remain unchecked.
 
+The user adopted the strict fingerprint server change and declined waiting for a fixed server build.
+The independent Java policy now passes 46 container assertions. Server repository checks passed.
+It supports atomic accepted-set updates, immutable revision readback, exact CN/fingerprint checks, and explicit approval deadlines.
+Missing state, expiry, restart, and explicit invalidation deny access. The caller must detect authority failure.
+The policy is not connected to TAK authentication yet. See `evidence/i1-strict-policy.txt`.
+Matching 5.8.84 source is missing. The inspected public source is 5.7.14; its version does not match the tested binary.
+
 ## Runtime tuple and owned resources
 
 The I0 native check used TAK `5.8-RELEASE-69`, Java `17.0.20.1+1`,
@@ -125,7 +133,7 @@ The Java test image uses Temurin `17.0.20.1+1`. The API images contain no Java.
 
 Base-image indexes are pinned in `Dockerfile` and include AMD64 and ARM64.
 Only ARM64 was run locally.
-Owned resources are these images and temporary build containers.
+Owned resources are these images, temporary build containers, and the separate strict-fingerprint server worktree.
 Smoke containers used `--rm` and have exited.
 Unrelated Podman state was preserved.
 No Kind context or namespace was selected.
@@ -145,6 +153,8 @@ Then implement the corresponding I2 adapters, operator, and seven REST operation
 Obtain the missing redesign file and final server base contract.
 Keep credential-update delivery disabled until real client tests establish a supported method.
 Keep production readiness blocked on current authority and full approved-set enforcement.
-The proposed strict approved-fingerprint server change needs an adoption decision.
-Implement and live-test the adopted server mechanism before completing I1.
+The strict approved-fingerprint design is adopted. Do not ask for that approval again.
+Obtain matching 5.8.84 source, connect the tested policy to server authentication and management, and build the pinned artifacts together.
+Version the server schema and prove projection delivery to messaging and API before claiming readiness.
+Live-test the adopted server mechanism before completing I1.
 Do not mark I1 complete or weaken its approved-fingerprint requirement.

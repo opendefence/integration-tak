@@ -48,6 +48,7 @@ Obtain the source files before relying on their contracts.
 | Full setup, `0f9d9db` | ATAK, ATAK Mini, iTAK, WinTAK, and TAK Tracker ZIPs. XML escaping, stable internal filenames, and fresh outer filenames. |
 | Checkpoint, `0eb51ad` | Sanitized test logs, image digests, scope limits, and remaining dependencies. |
 | Binary component probe, `67b94e2` | Actual 5.8.84 WAR classes prove the unapproved same-UUID certificate receives the configured role and groups. |
+| Strict fingerprint policy, server commit `7f1e42c` | Independent Java policy passes 46 container assertions. It is not wired into TAK authentication yet. |
 
 The separate Java test image passed 116 tests with no skips and 100% package coverage.
 RSA and EC tests exercised actual keytool import, read, entry types, and certificate export.
@@ -126,8 +127,17 @@ Static 5.8.84 inspection found a fingerprint-or-identifier authentication path.
 The component probe confirmed that this path grants the configured role and groups to an unapproved same-UUID certificate.
 The scalar fingerprint field does not establish a strict set of approved certificates.
 Alternating registrations or encoding a list in that field is not an acceptable implementation.
-The proposed strict approved-fingerprint server extension is not adopted.
-Obtain an explicit design/adoption decision and implement any adopted change in the server project.
+The user adopted the strict approved-fingerprint server extension on 2026-10-10.
+Do not request the adoption decision again. The user does not expect a fixed server build soon.
+The initial policy implementation is on server branch `feat/strict-fingerprint`, commit `7f1e42c`.
+Its separate local worktree is `../tak-server-strict-fingerprint`; the original server worktree has unrelated work.
+Read `extensions/strict-fingerprint/README.md` there before continuing.
+The policy is tested in isolation. It does not enforce authentication in the shipped server.
+See `docs/evidence/i1-strict-policy.txt` for results and limits.
+Matching TAK 5.8.84 source remains missing. Its location was requested.
+Public source at `5187abd46d827d37cfc5708805eced197a837e49` is based on 5.7.14 and is not a substitute.
+Connect the policy to the server schema, trusted management writer, and all supported certificate authentication paths.
+Prove delivery to both messaging and API processes. Recheck cached HTTP identities and stop denied CoT before routing.
 Update its schema, management interface, implementation, and pinned JAR together.
 The optional disconnect guard decision remains open.
 A post-authentication disconnect does not prove rejection before the first CoT message.

@@ -1,0 +1,33 @@
+I1 strict fingerprint policy conformance
+Date: 2026-10-10
+Scope: independent policy implementation; not a patched TAK binary or a live TAK test.
+
+Server repository branch: feat/strict-fingerprint
+Server policy commit: 7f1e42c
+Local worktree: /Users/rambo/devel/pvarki/opendefence/tak-server-strict-fingerprint
+Source and test command: extensions/strict-fingerprint/README.md in that worktree.
+Runtime: Java 17, Linux ARM64.
+JDK image: eclipse-temurin:17-jdk-noble@sha256:fb79620c3f6ee8f1c7530a8dc4fd49e3b410bcef037694ad4858a1553bac4170
+Isolation: Podman --network none, /work tmpfs, read-only source mount, 2 CPUs, 512 MiB memory.
+Compilation: javac --release 17 -Xlint:all -Werror.
+Fixtures: one temporary CA and eight distinct signed leaves. Each leaf signature was verified.
+
+RESULT main=ALLOW tak_only=ALLOW unapproved_same_uuid=DENY missing_account=DENY immutable_readback=PASS
+RESULT single_certificate_removal=PASS empty_set=DENY stale_write=REJECT invalid_write_preserves_state=PASS
+RESULT wrong_cn=DENY duplicate_cn=DENY missing_cn=DENY multivalued_rdn=ALLOW ca_leaf=DENY
+RESULT lease_deadline=DENY expired_leaf=DENY future_leaf=DENY unavailable_projection=DENY restart=DENY pre_restart_write=REJECT
+RESULT concurrent_replacement=ONE_WINNER assertions=46
+
+Exit status: 0. Applicable server repository checks passed. Ponytail review found no remaining defects in this slice.
+The duplicate-CN regression initially failed for identical values inside one RDN.
+The implementation now checks the original RDN attribute count before accepting the JNDI CN value.
+
+Limits:
+- TAK does not call this policy yet. The unmodified 5.8.84 binary still fails the approved-set requirement.
+- The projection is in one JVM. It has no trusted management transport, cross-process distribution, or persistence.
+- Restart and explicit invalidation deny all access until a fresh projection is supplied.
+- The owner must invalidate on authority failure. No Core availability monitor exists yet.
+- TLS chain validation precedes this check. Roles, group caches, token paths, and HTTP caches remain unwired.
+- No TLS, CoT, HTTPS, remote JNI, client, or session-resumption acceptance is claimed.
+- Matching 5.8.84 source and versioned Core contracts remain dependencies.
+- No generated private keys or certificates were retained. No server binary or shared deployment changed.

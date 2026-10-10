@@ -94,7 +94,8 @@ The experimental server image `localhost/tak-server:t1-5.8.84-pr136` contains th
 The component result therefore applies to its Java artifacts.
 This does not replace a live TAK TLS and CoT authentication test.
 
-The proposed repair, if adopted later, belongs in the server project:
+The user adopted the following repair on 2026-10-10 and asked to proceed without waiting for a fixed server build.
+This change belongs in the server project:
 
 1. Add an explicit strict file-auth mode with a set of approved leaf SHA-256 fingerprints per UUID.
 2. Check both the certificate's UUID and its exact fingerprint before assigning roles or groups.
@@ -107,8 +108,26 @@ The proposed repair, if adopted later, belongs in the server project:
 Keep the legacy scalar representation separate from the new strict mode.
 Do not encode a list inside the scalar value.
 The server change must update the schema, management interface, implementation, and pinned JAR together.
-Prefer an upstream implementation with these properties.
-This is a proposal, not an adopted extension or a production implementation.
+Proceed with the custom server change. Adoption is settled; production enforcement is not implemented.
+
+The first implementation slice is committed in the server repository at `7f1e42c`, branch `feat/strict-fingerprint`.
+Its separate worktree is `../tak-server-strict-fingerprint`.
+`extensions/strict-fingerprint/` contains the Java policy, a container test, and the remaining wiring plan.
+The policy checks exact certificate CN and SHA-256, leaf validity, and approval expiry.
+It provides immutable readback and atomic updates that reject stale revisions, including revisions from before restart.
+Empty, missing, expired, or explicitly invalidated projections deny access.
+The owner must signal authority failure; the policy has no Core availability monitor.
+The final container run passed 46 assertions, including two approved same-UUID leaves and rejection of the third.
+See [policy conformance evidence](evidence/i1-strict-policy.txt).
+
+This policy is not wired into the 5.8.84 authentication classes.
+The matching source bundle is still missing; the local server repository contains distribution artifacts.
+Public source HEAD `5187abd46d827d37cfc5708805eced197a837e49` merges `upstream/5.7-RELEASE-14`.
+The `5.8*` tag query returned no matches. Do not substitute that source for the tested binary.
+The source location was requested. The existing server worktree and shared test cluster were preserved.
+Next, wire the policy into the schema, trusted management path, and every supported certificate authentication path.
+Cover cached HTTP identities, token/group-cache grants, and denial before message routing.
+Then build the server and management JAR together and run live acceptance tests.
 
 Residual risks remain explicit.
 A stale approval projection can retain access after a Core change.
@@ -181,5 +200,5 @@ Its generated private keys disappeared with that container.
 No keys, tokens, or kubeconfigs are in the repository changes.
 
 The component probe is complete for the current 5.8.84 artifacts.
-Complete live authentication tests against the agreed server base after the strict approved-set design is adopted.
+Complete live authentication tests after the adopted strict approved-set design is wired into the agreed server base.
 I1 cannot be marked complete until the approved-fingerprint mechanism and required Core contracts are established.
