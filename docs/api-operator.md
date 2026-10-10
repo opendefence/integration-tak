@@ -143,9 +143,9 @@ Implement these inputs when their versioned contracts are available:
 
 `kubectl kustomize k8s/integration` renders the integration workloads, scoped RBAC,
 the grant Secret and an internal Service. For an OpenDefence stack installation,
-`kubectl kustomize k8s/stack` also includes the TAK Server base from a sibling
-`../tak-server` checkout. This repository owns that composition and the operator's
-Ignite ingress policy; TAK Server owns the reusable StatefulSet, Services, PVC,
+`kubectl kustomize k8s/stack` also includes the TAK Server integrated overlay from a sibling
+`../tak-server` checkout. This repository owns that composition; TAK Server owns the operator's
+Ignite ingress policy, reusable StatefulSet, Services, PVC,
 bootstrap Job and server configuration.
 The API and operator use separate service accounts and Deployments.
 Both run without root, with a read-only root filesystem and a bounded temporary volume.
@@ -155,9 +155,10 @@ API TCP probes establish process reachability only; they do not establish curren
 Check out the versioned TAK Server repository beside this one. Provision the
 database and required identity/password Secrets in `integration-tak` as described
 in [its Kubernetes guide](../../tak-server/k8s/README.md). Create the namespace,
-apply `k8s/stack/schema` and wait for `tak-schema-5-8-84` to complete, then grant
-the runtime database role before applying `k8s/stack`. The schema Job is separate
-so the installer can require its success before starting server Pods.
+apply `k8s/stack/schema` and wait for `tak-schema-5-8-84` to complete. Apply
+`k8s/stack/grants` and wait for `tak-grants-5-8-84` to complete before applying
+`k8s/stack`. These Jobs are separate so the installer can require their success
+before starting server Pods.
 An installation overlay must pin accepted image digests, set the server address,
 database endpoint, storage class and real public origin. The checked-in image tags
 and settings are local candidates, not a deployable release.

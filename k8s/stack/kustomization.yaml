@@ -3,5 +3,4 @@ kind: Kustomization
 namespace: integration-tak
 resources:
   - ../integration
-  - ../../../tak-server/k8s/base
-  - operator-networkpolicy.yaml
+  - ../../../tak-server/k8s/overlays/integrated
