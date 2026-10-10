@@ -6,7 +6,7 @@ from typing import cast
 from io import BytesIO
 from pathlib import PurePosixPath
 from uuid import UUID
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # nosec B405 - Parses only XML generated from test fixtures.
 from zipfile import ZipFile
 
 from cryptography import x509
@@ -31,7 +31,7 @@ def test_profile_archive_and_preference_contract(material: CredentialFixture, pr
         names = archive.namelist()
         assert len(names) == 4
         assert all(not PurePosixPath(name).is_absolute() and ".." not in PurePosixPath(name).parts for name in names)
-        manifest = ET.fromstring(archive.read("MANIFEST/manifest.xml"))
+        manifest = ET.fromstring(archive.read("MANIFEST/manifest.xml"))  # nosec B314 - Fixture-generated XML.
         contents = [entry.attrib["zipEntry"] for entry in manifest.findall("Contents/Content")]
         assert contents == names[1:]
         assert all(name.endswith(".p12") for name in contents[:2]) and contents[2] == "server.pref"
@@ -39,7 +39,7 @@ def test_profile_archive_and_preference_contract(material: CredentialFixture, pr
             entry.attrib["name"]: entry.attrib["value"] for entry in manifest.findall("Configuration/Parameter")
         }
         assert ("onReceiveImport" in parameters) == (profile != "itak")
-        preferences = ET.fromstring(archive.read("server.pref"))
+        preferences = ET.fromstring(archive.read("server.pref"))  # nosec B314 - Fixture-generated XML.
         blocks = {block.attrib["name"]: {entry.attrib["key"]: entry.text for entry in block} for block in preferences}
         streams = blocks["cot_streams"]
         assert streams["connectString0"] == "tak.example.test:8089:ssl"

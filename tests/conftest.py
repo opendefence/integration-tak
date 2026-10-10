@@ -62,7 +62,7 @@ def material(request: pytest.FixtureRequest) -> CredentialFixture:
         private_key_pem=keys[-1].private_bytes(
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
         ),
-        password="fixture-only-password",  # pragma: allowlist secret
+        password="fixture-only-password",  # nosec B106 - Test fixture. # pragma: allowlist secret
         expected_cn="00000000-0000-4000-8000-000000000001",
     )
     return CredentialFixture(credential, certificates[0], certificates[1], certificates[2], now)

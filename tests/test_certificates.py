@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 import os
 from pathlib import Path
-import subprocess
+import subprocess  # nosec B404 - Runs keytool for fixture compatibility checks.
 from typing import TypedDict
 
 from cryptography import x509
@@ -60,9 +60,9 @@ def test_pkcs12_preserves_key_leaf_chain_and_unique_trust(material: CredentialFi
     [
         ({"expected_cn": "different-user"}, "expected CN"),
         ({"expected_cn": ""}, "expected CN"),
-        ({"password": "short"}, "password"),  # pragma: allowlist secret
-        ({"password": "nonascii-ä"}, "password"),  # pragma: allowlist secret
-        ({"password": "control\x00character"}, "password"),  # pragma: allowlist secret
+        ({"password": "short"}, "password"),  # nosec B105 - Invalid test input. # pragma: allowlist secret
+        ({"password": "nonascii-ä"}, "password"),  # nosec B105 - Invalid test input. # pragma: allowlist secret
+        ({"password": "control\x00character"}, "password"),  # nosec B105 - Invalid test input. # pragma: allowlist secret
         ({"password": "x" * 129}, "password"),
         ({"private_key_pem": b""}, "Private key"),
         ({"private_key_pem": b"x" * (MAX_KEY_BYTES + 1)}, "Private key"),
@@ -149,7 +149,7 @@ def test_reject_invalid_trust(material: CredentialFixture, kind: str) -> None:
 
 def test_java_entry_types_export_and_import(material: CredentialFixture, keytool: str, tmp_path: Path) -> None:
     def run(*arguments: str, password: str) -> str:
-        return subprocess.run(
+        return subprocess.run(  # nosec B603 - Resolved keytool path and fixture arguments; no shell.
             [keytool, "-J-Duser.language=en", *arguments],
             env={**os.environ, "P12_TEST_PASSWORD": password},
             check=True,

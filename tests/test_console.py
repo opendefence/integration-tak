@@ -1,6 +1,6 @@
 """Verify CLI metadata and imports without Java."""
 
-import subprocess
+import subprocess  # nosec B404 - Runs the current interpreter for CLI isolation checks.
 import sys
 from importlib.metadata import version
 
@@ -27,7 +27,7 @@ import opendefence_integration_tak.packages
 import runpy
 runpy.run_module('opendefence_integration_tak', run_name='__main__')
 """
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603 - Current interpreter and fixed test script/arguments; no shell.
         [sys.executable, "-c", script, *arguments], capture_output=True, text=True, timeout=10, check=True
     )
     expected = __version__ if "--version" in arguments else "foundation only"
