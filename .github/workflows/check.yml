@@ -30,7 +30,7 @@ jobs:
           python-version: "3.14"
           uv-version: "0.12.13"
       - run: uv run --locked prek run --all-files
-      - run: uv run --locked pytest --junitxml=pytest.xml
+      - run: uv run --locked pytest --require-keytool --junitxml=pytest.xml
       - run: uv build --no-sources
       - uses: actions/upload-artifact@v4
         if: always()
@@ -48,6 +48,10 @@ jobs:
         run: |
           docker build --target api-test -t odintegration-tak:api-test .
           docker run --rm odintegration-tak:api-test
+      - name: Test Java package compatibility
+        run: |
+          docker build --target package-test -t odintegration-tak:package-test .
+          docker run --rm odintegration-tak:package-test
       - name: Verify separate runtimes
         run: |
           for runtime in api operator; do

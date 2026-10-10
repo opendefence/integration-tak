@@ -5,7 +5,9 @@ description = "OpenDefence TAK integration"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14,<4.0"
-dependencies = []
+dependencies = [
+    "cryptography>=46,<51",
+]
 
 [project.urls]
 Repository = "https://github.com/opendefence/integration-tak"
