@@ -1,0 +1,4 @@
+publicOrigin: https://local-dev.opendefence.fi
+images:
+  api: localhost/opendefence-integration-tak-api:i2-http-operator
+  operator: localhost/opendefence-integration-tak-operator:i2-http-operator

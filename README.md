@@ -35,6 +35,19 @@ The package builder exports already-issued material.
 It does not authorize delivery or create accounts, keys, or certificates.
 Credential-update delivery remains disabled until client tests establish a supported method.
 
+## Kubernetes package
+
+Run `zarf dev lint . --flavor local-dev` to check the local package.
+Run `zarf dev inspect manifests . --flavor local-dev --values values/local-dev.yaml` to check its manifests.
+Run `zarf package create . --flavor local-dev` to build the local package.
+Load the images named in `values/local-dev.yaml` into Kind before deployment.
+Deploy with `--values values/local-dev.yaml` to set the local image names and public origin.
+
+The `production` flavor also packages manifests only.
+Set the public origin and both image names in a values file before deployment.
+The cluster must be able to pull these images from its registry.
+Do not use this package for production authentication until the Core adapters and strict TAK server checks pass.
+
 ## Source foundation
 
 Tooling is adapted from `pvarki/python-tak-operator` at

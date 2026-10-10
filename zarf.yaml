@@ -1,0 +1,34 @@
+kind: ZarfPackageConfig
+# shortcut: Images stay external; bundle pinned images for an offline release.
+metadata:
+  name: integration-tak
+  description: OpenDefence TAK integration API and operator
+values:
+  files:
+    - values/values.yaml
+  schema: values/values.schema.json
+components:
+  - name: integration-local-dev
+    required: true
+    only: {flavor: local-dev}
+    manifests:
+      - name: integration-tak
+        namespace: integration-tak
+        template: true
+        kustomizations:
+          - k8s/overlays/local-dev
+    healthChecks:
+      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-api, namespace: integration-tak}
+      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-operator, namespace: integration-tak}
+  - name: integration-production
+    required: true
+    only: {flavor: production}
+    manifests:
+      - name: integration-tak
+        namespace: integration-tak
+        template: true
+        kustomizations:
+          - k8s/overlays/production
+    healthChecks:
+      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-api, namespace: integration-tak}
+      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-operator, namespace: integration-tak}
