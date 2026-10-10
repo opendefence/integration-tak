@@ -5,8 +5,9 @@
 I1 is incomplete.
 The user confirmed `gpt-6-astra` / `xhigh` with "Switched; resume I1".
 The host cannot verify the active model metadata.
-The user then instructed: "Skip the binary probing for now."
-Binary investigation is deferred at that point.
+The user resumed binary probing and confirmed the I1 gate on 2026-10-10.
+The 5.8.84 component probe now compiles and passes its assertions.
+It proves that the current binary fails the strict approved-set requirement.
 No production authentication, Core adapter, or server deployment has changed.
 
 ## Companion sources
@@ -73,14 +74,23 @@ The optional certificate-revocation lookup rejects a known revoked record.
 An absent record continues through the inspected code; this is not a positive approved-set check.
 No suitable existing approved-set mechanism has been proven.
 
-A draft component reproduction is parked in `spikes/i1/`.
-It uses the actual WAR classes and generated local certificates.
-It does not replace a live TAK authentication test.
-Its first run verified the four generated certificate chains, then failed Java compilation.
-The fixture used invalid `Role.ROLE_USER` and `ConnectionType.STREAMING` enum names.
-No authentication or contact assertion ran.
-The source remains unfinished and untracked.
-Do not treat its planned assertions as results.
+The component reproduction is in `spikes/i1/`.
+It uses the actual WAR classes and generates certificates in container tmpfs.
+The first run failed because `Role.ROLE_USER` and `ConnectionType.STREAMING` do not exist in 5.8.84.
+Container `javap` inspection identified `Role.ROLE_READONLY` and `ConnectionType.CORE` as the exact binary values.
+The repaired probe passed with a pinned Java 17 JDK and no network.
+
+The main, TAK-only, and unapproved certificates had unique fingerprints and the same UUID CN.
+The fixture alternated the stored scalar fingerprint between main and TAK-only.
+All three same-UUID certificates received `ROLE_READONLY` and both `fixture` group directions.
+The different-UUID certificate did not receive `ROLE_READONLY`.
+It received the binary's `ROLE_ANONYMOUS` and `__ANON__` group fallback.
+The process returned exit status 0 after all assertions.
+See `docs/evidence/i1-binary-probe.txt` for the sanitized result matrix.
+
+The experimental server image `localhost/tak-server:t1-5.8.84-pr136` contains the same tested WAR and `UserManager.jar` checksums.
+The component result therefore applies to its Java artifacts.
+This does not replace a live TAK TLS and CoT authentication test.
 
 The proposed repair, if adopted later, belongs in the server project:
 
@@ -109,8 +119,8 @@ The guard decision remains open; no decision to omit it has been made.
 
 | Surface | Current evidence | Implementation consequence |
 | --- | --- | --- |
-| Package preferences | Required by the integration handoff; no new package code yet | Full setup can carry the current desired callsign. Preserve client overrides. |
-| Contact table | `DistributedContactManager.updateContact` calls `SubscriptionStore.putContactToContactUid` | A contact record can be replaced by UID. Live remote execution is untested. |
+| Package preferences | The pure full-setup builder emits the current desired callsign where the client format is known | Real client import and override behavior remain untested. |
+| Contact table | The component probe changed `CLIENT` to `DESIRED` through `DistributedContactManager.updateContact` | The actual binary can replace the contact record by UID in process. Live remote execution is untested. |
 | Next CoT contact | `SubmissionService.processContactMessage` constructs a new contact from the received callsign, endpoint, and UID, then calls `updateContact` | A contact-table change is not evidence of a durable client rename. |
 | Live subscription | No update established by the inspected contact method | Do not advertise immediate subscription rename. |
 | Peer display | Not tested | Do not advertise immediate peer rename. |
@@ -121,7 +131,8 @@ A preferences-only update still needs package and client validation.
 Do not emit `disablePreferenceItem_locationCallsign=true`.
 Do not infer the CoT UID from a UUID or callsign.
 Bind it to the authenticated connection before any contact mutation.
-No test has yet proved that a callsign edit preserves certificate bytes and permissions.
+The component probe preserved the fixture certificate bytes, UUID account, role, and group list during a contact-map edit.
+This does not prove durable client or peer presentation behavior.
 
 ## Rotation evidence
 
@@ -142,18 +153,19 @@ No observer, rotation, reconnection, or session-resumption test ran in I1.
 Temporary evidence is under `/private/tmp/integration-tak-i1/`:
 
 - `5.8.84/`: extracted artifacts, unpacked WAR, and `javap -p -c` output.
-- `probe.log`: the draft's certificate checks and compilation failure.
+- `probe.log`: the original certificate checks and compilation failure.
+- `probe-final.log` and `probe-pinned.log`: successful repaired runs with raw process logs.
 - `shared-redesign.html` and `shared-core.html`: fetched public conversations.
 - `shared-*-messages.txt`: extracted text used for the source review.
 
 These temporary files are not durable release evidence.
 They contain generated or fetched investigation data and are not committed.
+The sanitized component result is committed at `docs/evidence/i1-binary-probe.txt`.
 All probe containers used `--rm`.
 The attempted reproduction ran with `--network none` and a temporary filesystem.
 Its generated private keys disappeared with that container.
 No keys, tokens, or kubeconfigs are in the repository changes.
 
-Resume binary work only when requested.
-Then repair the fixture against the exact enum signatures before rerunning it.
-Complete live authentication tests against the agreed server base after the server design is adopted.
+The component probe is complete for the current 5.8.84 artifacts.
+Complete live authentication tests against the agreed server base after the strict approved-set design is adopted.
 I1 cannot be marked complete until the approved-fingerprint mechanism and required Core contracts are established.
