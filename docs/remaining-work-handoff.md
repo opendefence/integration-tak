@@ -54,6 +54,13 @@ Obtain the source files before relying on their contracts.
 | Checkpoint, `0eb51ad` | Sanitized test logs, image digests, scope limits, and remaining dependencies. |
 | Binary component probe, `67b94e2` | Actual 5.8.84 WAR classes prove the unapproved same-UUID certificate receives the configured role and groups. |
 | Strict fingerprint policy, server commit `7f1e42c` | Independent Java policy passes 46 container assertions. It is not wired into TAK authentication yet. |
+| API/operator slice, `3739c08` | Seven HTTP routes, bounded Secret-backed grants, schema-based Core readers, UserBinding ownership, separate workload commands and scoped integration manifests. Production authority and strict JNI adapters remain unavailable. |
+
+The latest API/operator image passed 265 tests with no skips and 96.57% coverage with branches enabled.
+Both runtime targets passed their boundary checks; the operator JNI check retains the I0 5.8.69 tuple.
+Hooks, distributions and local Kustomize rendering passed. No cluster resources were applied.
+See [API/operator evidence](evidence/i2-api-operator.txt) for the current proof and limits.
+The earlier package-only results below remain historical evidence.
 
 The separate Java test image passed 116 tests with no skips and 100% package coverage.
 RSA and EC tests exercised actual keytool import, read, entry types, and certificate export.

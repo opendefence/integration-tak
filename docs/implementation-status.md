@@ -26,12 +26,12 @@ The completed I2 application slice and remaining adapters are described in [API 
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `27c7b97`.
+- Implementation HEAD before this checkpoint: `3739c08`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
 - Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
 - Current server plan: `c0a1b87`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. That server worktree also has active, uncommitted packaging work; preserve it.
-- I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives).
+- I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives), `3739c08` (HTTP routes, grants and binding reconciliation).
 - Binary probe: `spikes/i1/`; tracked and complete for the current 5.8.84 artifacts.
 - Supplied handoff and OpenAPI files remain untracked and unchanged.
 - Prototype tooling: `b332e527c7dedf5e3f0a972b792c7d697dcace6b`.
@@ -72,7 +72,8 @@ The old import and CLI were absent after `uv sync --locked`. No compatibility al
 Hosted CI and AMD64 were not rerun for the rename.
 
 Keep JNI dependencies in the operator extra. Keep PyJNIus pinned to `1.7.0`.
-The images print help by default. Neither workload is enabled yet.
+The images print help by default. Separate `api` and `operator` commands now start the workload processes.
+Production authority and JNI projection adapters are not enabled.
 Publishing and Snyk remain disabled until their repository variables enable them.
 Do not copy prototype Core models or server deployments.
 
@@ -96,7 +97,7 @@ See [package construction](packages.md) and [PKCS#12 export](certificates.md).
 
 I0 separately verified the operator image and a real JNI call.
 See `evidence/i0-operator-runtime.txt` and `evidence/i0-api-runtime.txt`.
-That image was not rebuilt or retested in I2.
+The pure package checkpoint did not rebuild that image. The later API/operator checkpoint below verifies both targets.
 GitHub/ARC workflows, AMD64 runtime, live TAK authentication, Kind deployment, and client devices remain unchecked.
 
 I1 inspected candidate 5.8.84 schemas and bytecode.
@@ -126,6 +127,36 @@ The policy is not connected to TAK authentication yet. See `evidence/i1-strict-p
 The inspected public source is 5.7.14; its version does not match the tested binary.
 The later server plan supersedes the missing-source prerequisite with external injection against pinned vendor artifacts.
 Strict enforcement still requires verified hooks in both JVMs and a versioned management capability.
+
+## API/operator checkpoint, `3739c08`
+
+The fresh user confirmation resumed I2 at `gpt-6.1-sol` / `high`; model metadata remains user-provided.
+Seven HTTP operations, a bounded Secret CAS store, typed Core readers, owned UserBindings and separate CLI workloads are implemented.
+The integration manifests include only its workloads, scoped RBAC and an internal Service.
+The production adapters and public ingress remain open. Defaults deny delivery and leave bindings unsynced.
+See [API and operator](api-operator.md) for the internal seams and exact remaining inputs.
+
+- Final ARM64 Java container: **265 passed, no skips; 96.57% coverage with branches enabled**. One upstream Starlette/AnyIO deprecation warning.
+- Local macOS run before the final routing change: 263 passed, two keytool checks skipped; 96.56% coverage. Final Java tests include that change and both keytool checks.
+- All-file prek checks and commit hooks passed, including strict Pyrefly, Bandit, secret scan and lockfile checks.
+- API and operator builds passed. API boundary check and operator native JNI check passed with no network.
+- API help/version and operator subcommand help passed. Wheel and source distribution builds passed.
+- `kubectl kustomize k8s/integration` and `git diff --check` passed. No resources were applied.
+- Inline Ponytail review covered ownership, secret delivery, freshness, CAS races, token rotation and restore. Readiness validation, receipt expiry and routing defects were fixed. No remaining defects were found within this implemented application slice; the production gaps remain blockers.
+- Sanitized evidence: [I2 API/operator checks](evidence/i2-api-operator.txt). The cumulative audit remains I5 work.
+
+Image tags use `i2-http-operator`, all `linux/arm64`:
+
+| Image | Manifest digest |
+| --- | --- |
+| `localhost/opendefence-integration-tak-package` | `sha256:4007f35e04f4c5ab69ed3b846f6cc7eea35805a858fb0ac871e0a517e14d9a0f` |
+| `localhost/opendefence-integration-tak-api` | `sha256:f66f3e821d098080414d990338429bacf64f8b4a0f116de0e00ebad9eb1fcc08` |
+| `localhost/opendefence-integration-tak-operator` | `sha256:61cbc39ed290cb39a2a706957d351436cd61f8dc9ddc7d898d714db026a4a121` |
+
+The operator native check still uses the I0 TAK 5.8.69 JAR and Temurin `17.0.20.1+1`, with PyJNIus `1.7.0`.
+It does not establish final 5.8.84 server compatibility or strict enforcement.
+No cluster context was selected. Shared server work, Kubernetes resources, PVCs and registry state were preserved.
+Both supplied untracked inputs remain unchanged. No tokens, credential material or kubeconfigs were saved as evidence.
 
 ## Runtime tuple and owned resources
 
@@ -174,7 +205,7 @@ It records the user-reported Daybreak Blue probe execution and the remaining dep
 Use the supplied Core CRDs for resource shapes and integration-owned UserBindings.
 Obtain the remaining contracts for credential inventory, approval, effective permissions,
 binding readiness revisions, credential namespace access, HTTP authority, and authenticated activation reporting.
-Then implement the corresponding I2 adapters, operator, and seven REST operations.
+Then connect production credential, authority and strict JNI adapters to the implemented operator and seven REST operations.
 Obtain the missing redesign file and final server base contract.
 Keep credential-update delivery disabled until real client tests establish a supported method.
 Keep production readiness blocked on current authority and full approved-set enforcement.
