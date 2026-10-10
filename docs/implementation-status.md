@@ -121,6 +121,9 @@ No fixture keys or ZIPs were saved as evidence.
 
 ## Next action
 
+Use the [remaining work handoff](remaining-work-handoff.md) to resume implementation.
+It includes the user-reported Daybreak access and the procedure for possible binary-probe safety blocks.
+
 Obtain the versioned Core contracts for credential inventory, approval, effective permissions,
 UserBinding ownership, namespace access, HTTP authority, and authenticated activation reporting.
 Then implement the corresponding I2 adapters, operator, and seven REST operations.
