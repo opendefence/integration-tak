@@ -15,9 +15,13 @@ The integration is not release-ready.
 | I2 | `gpt-6.1-sol` / `high` | User: "Switched; resume I2" |
 
 The session cannot verify model runtime metadata or switch the active model.
-The latest user message explicitly confirms Astra / XHigh for this continuation.
+The earlier I1 continuation explicitly confirmed Astra / XHigh.
 The user reports that Daybreak Blue ran the earlier probing tests. That provenance is not independently verified.
 I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
+The user requested REST API and Kubernetes operator implementation after the I1 continuation.
+The I2 transition requires a fresh `gpt-6.1-sol` / `high` confirmation or an explicit gate waiver.
+An unspecified continuation does not confirm that switch under the supplied handoff.
+Product implementation has not resumed. The latest verified checkpoint is `f04c1ef`.
 
 ## Checkpoint and sources
 
@@ -25,7 +29,8 @@ I1 is the current escalation stage. I2 remains partial. Do not enter I3 yet.
 - Implementation HEAD before this checkpoint: `27c7b97`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
-- Server policy: `7f1e42c` on `feat/strict-fingerprint`, in separate worktree `../tak-server-strict-fingerprint`.
+- Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
+- Current server plan: `c0a1b87`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. That server worktree also has active, uncommitted packaging work; preserve it.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives).
 - Binary probe: `spikes/i1/`; tracked and complete for the current 5.8.84 artifacts.
 - Supplied handoff and OpenAPI files remain untracked and unchanged.
@@ -118,7 +123,9 @@ The independent Java policy now passes 46 container assertions. Server repositor
 It supports atomic accepted-set updates, immutable revision readback, exact CN/fingerprint checks, and explicit approval deadlines.
 Missing state, expiry, restart, and explicit invalidation deny access. The caller must detect authority failure.
 The policy is not connected to TAK authentication yet. See `evidence/i1-strict-policy.txt`.
-Matching 5.8.84 source is missing. The inspected public source is 5.7.14; its version does not match the tested binary.
+The inspected public source is 5.7.14; its version does not match the tested binary.
+The later server plan supersedes the missing-source prerequisite with external injection against pinned vendor artifacts.
+Strict enforcement still requires verified hooks in both JVMs and a versioned management capability.
 
 ## Runtime tuple and owned resources
 
@@ -155,6 +162,12 @@ No fixture keys, certificates, or ZIPs were saved as evidence.
 
 ## Next action
 
+Resume product work after the required I2 model confirmation or an explicit waiver.
+Start with schema-based User/Group/Role readers and integration-owned UserBinding lifecycle, plus the seven REST operations in OpenAPI `1.0.0-draft.5`.
+Use the existing package builder. Keep the API JVM-free and the JNI bridge inside the operator process.
+Test unavailable authority, denial, exact credential selection, grants, stale applied state, retries, and binding replacement.
+Keep unresolved credential, HTTP authority, and server capability inputs explicit; do not invent Core resources or report fixture success as production readiness.
+
 Use the [remaining work handoff](remaining-work-handoff.md) to resume implementation.
 It records the user-reported Daybreak Blue probe execution and the remaining dependencies.
 
@@ -166,7 +179,8 @@ Obtain the missing redesign file and final server base contract.
 Keep credential-update delivery disabled until real client tests establish a supported method.
 Keep production readiness blocked on current authority and full approved-set enforcement.
 The strict approved-fingerprint design is adopted. Do not ask for that approval again.
-Obtain matching 5.8.84 source, connect the tested policy to server authentication and management, and build the pinned artifacts together.
-Version the server schema and prove projection delivery to messaging and API before claiming readiness.
+Use the current server plan for external injection of the tested policy into authentication and management.
+Version the extension configuration and management capability with the pinned, unchanged vendor artifacts.
+Prove projection delivery to messaging and API before claiming readiness.
 Live-test the adopted server mechanism before completing I1.
 Do not mark I1 complete or weaken its approved-fingerprint requirement.
