@@ -5,6 +5,7 @@ The project contains foundation tooling and a pure client package builder.
 The operator and delivery API are not implemented yet.
 See `docs/implementation-status.md` for stage gates and blockers.
 See [remaining work handoff](docs/remaining-work-handoff.md) to continue implementation, including possible binary-probe safety blocks.
+See [server change handoff](docs/tak-server-change-handoff.md) for server packaging, strict authentication, and release acceptance work.
 See [package construction](docs/packages.md) and [PKCS#12 export](docs/certificates.md) for the available Python functions.
 
 ## Development

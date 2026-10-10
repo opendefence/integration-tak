@@ -36,6 +36,7 @@ The two shared conversations are supporting sources, not a complete copy of that
 
 The Core working handoff is at `/Users/rambo/Downloads/rasenmaeher-core-architecture-handoff.md`.
 The server handoff is at `../tak-server/tak-server-implementation-handoff.md`.
+Use the [consolidated server change handoff](tak-server-change-handoff.md) for the later single-Pod decision, adopted strict fingerprint extension, and all remaining server changes.
 Their local paths may be unavailable on another host.
 Obtain the source files before relying on their contracts.
 
