@@ -3,10 +3,13 @@ kind: ZarfPackageConfig
 metadata:
   name: integration-tak
   description: OpenDefence TAK integration API and operator
-values:
-  files:
-    - values/values.yaml
-  schema: values/values.schema.json
+variables:
+  - name: PUBLIC_ORIGIN
+    pattern: '^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?$'
+  - name: API_IMAGE
+    pattern: '^[A-Za-z0-9._:/@-]+$'
+  - name: OPERATOR_IMAGE
+    pattern: '^[A-Za-z0-9._:/@-]+$'
 components:
   - name: integration-local-dev
     required: true
@@ -17,9 +20,17 @@ components:
         template: true
         kustomizations:
           - k8s/overlays/local-dev
-    healthChecks:
-      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-api, namespace: integration-tak}
-      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-operator, namespace: integration-tak}
+    actions:
+      onDeploy:
+        after:
+          - description: Integration API to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-api, namespace: integration-tak, condition: Available}
+          - description: Integration operator to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-operator, namespace: integration-tak, condition: Available}
   - name: integration-production
     required: true
     only: {flavor: production}
@@ -29,6 +40,14 @@ components:
         template: true
         kustomizations:
           - k8s/overlays/production
-    healthChecks:
-      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-api, namespace: integration-tak}
-      - {apiVersion: apps/v1, kind: Deployment, name: integration-tak-operator, namespace: integration-tak}
+    actions:
+      onDeploy:
+        after:
+          - description: Integration API to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-api, namespace: integration-tak, condition: Available}
+          - description: Integration operator to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-operator, namespace: integration-tak, condition: Available}

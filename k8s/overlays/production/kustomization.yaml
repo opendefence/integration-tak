@@ -7,15 +7,15 @@ configMapGenerator:
   - name: integration-tak-settings
     behavior: merge
     literals:
-      - public-origin={{ .Values.publicOrigin }}
+      - public-origin=###ZARF_VAR_PUBLIC_ORIGIN###
 patches:
   - target: {kind: Deployment, name: integration-tak-api}
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: "{{ .Values.images.api }}"
+        value: "###ZARF_VAR_API_IMAGE###"
   - target: {kind: Deployment, name: integration-tak-operator}
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: "{{ .Values.images.operator }}"
+        value: "###ZARF_VAR_OPERATOR_IMAGE###"

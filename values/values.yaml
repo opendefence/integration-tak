@@ -1,5 +1,0 @@
-# Override these before production deployment; the placeholders cannot be pulled.
-publicOrigin: https://configure.invalid
-images:
-  api: registry.invalid/opendefence/integration-tak-api:unconfigured
-  operator: registry.invalid/opendefence/integration-tak-operator:unconfigured

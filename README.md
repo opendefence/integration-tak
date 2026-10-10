@@ -38,13 +38,23 @@ Credential-update delivery remains disabled until client tests establish a suppo
 ## Kubernetes package
 
 Run `zarf dev lint . --flavor local-dev` to check the local package.
-Run `zarf dev inspect manifests . --flavor local-dev --values values/local-dev.yaml` to check its manifests.
-Run `zarf package create . --flavor local-dev` to build the local package.
-Load the images named in `values/local-dev.yaml` into Kind before deployment.
-Deploy with `--values values/local-dev.yaml` to set the local image names and public origin.
+Install the `platform.opendefence.fi/v1alpha1` Core CRDs before you start the operator.
+Build the API and operator images with the commands below.
+Load both integration images into Kind before deployment.
+Run this command to deploy the local package:
+
+```sh
+zarf dev deploy --connected --flavor local-dev --components integration-local-dev \
+  --deploy-set-variables PUBLIC_ORIGIN=https://local-dev.opendefence.fi \
+  --deploy-set-variables API_IMAGE=localhost/opendefence-integration-tak-api:i2-http-operator \
+  --deploy-set-variables OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-http-operator
+```
+
+Run `zarf package create . --flavor local-dev` to build an archive.
+Use `--set-variables` with the same values when you deploy that archive.
 
 The `production` flavor also packages manifests only.
-Set the public origin and both image names in a values file before deployment.
+Set `PUBLIC_ORIGIN`, `API_IMAGE`, and `OPERATOR_IMAGE` before deployment.
 The cluster must be able to pull these images from its registry.
 Do not use this package for production authentication until the Core adapters and strict TAK server checks pass.
 
