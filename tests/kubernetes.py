@@ -8,7 +8,7 @@ from cloudcoil.client import APIClient, AsyncAPIClient, Config
 from cloudcoil.resources import Resource
 import httpx
 
-from opendefence_integration_tak.resources import UserBinding
+from lib_opendefence_core.models.v1alpha1 import UserBinding
 
 
 class KubernetesFixture:

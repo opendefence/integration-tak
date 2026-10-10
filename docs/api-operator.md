@@ -99,8 +99,12 @@ No private keys or ZIP bytes are stored in it.
 
 ## Binding lifecycle
 
-Typed readers use the supplied `platform.opendefence.fi/v1alpha1` User, Group and Role shapes.
-Unknown Core-owned fields are preserved. They are not interpreted as permission grants.
+Typed readers use `lib-opendefence-core==0.2.1+261010` for the supplied
+`platform.opendefence.fi/v1alpha1` User, Group, Role and UserBinding shapes.
+Only fields in that versioned model are interpreted as projection inputs; the models
+do not turn Core status into an effective permission grant.
+The package narrows callsigns beyond the supplied CRD snapshot; validate installed
+Core CRDs and existing User objects against the pinned package before deploying.
 The operator scans every ten seconds, with serial reconciliation and no fork.
 One User incarnation gets one deterministic binding name derived from its Kubernetes UID.
 The namespaced binding refers to `spec.userRef.name` and has a cluster-scoped User owner reference.

@@ -13,6 +13,7 @@ See [package construction](docs/packages.md) and [PKCS#12 export](docs/certifica
 
 Use Python 3.14 and uv.
 Run `uv sync --locked` to install the development environment without JNI.
+This fetches the pinned Core resource model package from the Nexus `pypilocal` index.
 Run `uv run --locked prek install` to install the Git hooks.
 Run `uv run --locked prek run --all-files` to check the files.
 Run `uv run --locked pytest` to test the package.
@@ -33,7 +34,8 @@ Credential-update delivery remains disabled until client tests establish a suppo
 Tooling is adapted from `pvarki/python-tak-operator` at
 `b332e527c7dedf5e3f0a972b792c7d697dcace6b`.
 The implementation is greenfield.
-The prototype's Core resource models and server deployments are not copied.
+Core resource models come from the versioned `lib-opendefence-core` package.
+The prototype's server deployments are not copied.
 
 ## Images
 

@@ -1,6 +1,14 @@
 # Core integration contract decisions
 
 The supplied Core CRDs establish the resource shapes and UserBinding ownership.
+The operator now imports its Core resource models from `lib-opendefence-core==0.2.1+261010`,
+resolved from the user-supplied Nexus `pypilocal` index and pinned by hash in `uv.lock`.
+The package requires Cloudcoil 0.8, now resolved from PyPI.
+Its `UserSpec.callsign` requires `^[a-z0-9]{3,30}$`, while the supplied CRD
+snapshot only requires a nonempty string. An existing User with a callsign
+outside the package pattern fails model validation during the operator scan.
+Check the installed CRD and existing User values against this package before deployment;
+the operator does not rewrite Core-owned callsigns.
 They unblock schema-based resource readers and binding lifecycle design.
 Production authorization, credential selection, and activation still need the contracts listed below.
 Do not treat every Core boundary as missing, or infer credential approval from user approval alone.
@@ -11,7 +19,8 @@ Source: [opendefence_core_crds.yaml](../../opendefence_core_crds.yaml), supplied
 API: `platform.opendefence.fi/v1alpha1`; each CRD serves and stores this version.
 SHA-256: `105bede6c1dd9f77c9effb6d8525d5882822a6ca67c75f14f2f59f64f106a747`.
 The input contains five CRDs and five Core service-account/RBAC resources.
-It remains outside this repository. A fresh checkout needs this exact snapshot or a versioned upstream equivalent.
+It remains outside this repository. The packaged models provide the versioned Python resource types;
+the CRD snapshot remains the schema reference for the cluster installation.
 
 | Resource | Scope | Supplied contract |
 | --- | --- | --- |
@@ -62,7 +71,7 @@ Do not copy prototype runtime assumptions into the production implementation.
 
 ## Next integration slice
 
-Use the supplied schema to define readers for User, Group, Role, and namespaced UserBinding resources.
+Use the shared package for readers of User, Group, Role, and namespaced UserBinding resources.
 Preserve the distinction between direct references, resolved references, and effective permissions.
 Keep Invite redemption in Core and use integration-specific RBAC.
 Test optional or missing status and replacement of a referenced object with a new UID.

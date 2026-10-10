@@ -250,12 +250,16 @@ wheels = [
 
 [[package]]
 name = "cloudcoil"
-version = "0.5.0.dev0"
-source = { git = "https://github.com/cloudcoil/cloudcoil.git?tag=0.8.0#e8ec4ef00c03b2c8974ed7ed0c99a7280ee802c8" }
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/04/c4/48d81195180716ab86aae7d9dd595625aa9ef54dcd16a8745d18acb4214b/cloudcoil-0.8.0.tar.gz", hash = "sha256:87961a2bf8b26d48eccfd70ae3a59bdd270348b6eda35e4669b4e07f2602ff9d", size = 731376, upload-time = "2026-09-10T03:30:29.36Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7a/19/9e25891df5ef6e4ec4c5c4cc8570a2ba0ca6a453c2ab647ab60f46764f0f/cloudcoil-0.8.0-py3-none-any.whl", hash = "sha256:5c28c036dd6c93b0a97290f36eceb4a38c6c79a4b14b6b750f336ce9875fdd86", size = 183485, upload-time = "2026-09-10T03:30:27.731Z" },
 ]
 
 [package.optional-dependencies]
@@ -553,6 +557,19 @@ wheels = [
 ]
 
 [[package]]
+name = "lib-opendefence-core"
+version = "0.2.1+261010"
+source = { registry = "https://nexus.dev.pvarki.fi/repository/pypilocal/simple/" }
+dependencies = [
+    { name = "cloudcoil" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://nexus.dev.pvarki.fi/repository/pypilocal/packages/lib-opendefence-core/0.2.1+261010/lib_opendefence_core-0.2.1+261010.tar.gz", hash = "sha256:d8dc38f7ec413be09f93f69c8ff5587a1595f17dc1055c40d972343a80ed2f2f" }
+wheels = [
+    { url = "https://nexus.dev.pvarki.fi/repository/pypilocal/packages/lib-opendefence-core/0.2.1+261010/lib_opendefence_core-0.2.1+261010-py3-none-any.whl", hash = "sha256:ec6eaec3dbd9d5166922beffa24b76d592ce68d538051b8cc9c4602f4c249bdc" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -580,6 +597,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cloudcoil" },
     { name = "cryptography" },
+    { name = "lib-opendefence-core" },
     { name = "starlette" },
     { name = "uvicorn" },
 ]
@@ -606,9 +624,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cloudcoil", git = "https://github.com/cloudcoil/cloudcoil.git?tag=0.8.0" },
-    { name = "cloudcoil", extras = ["kubernetes", "operator"], marker = "extra == 'operator'", git = "https://github.com/cloudcoil/cloudcoil.git?tag=0.8.0" },
+    { name = "cloudcoil", specifier = ">=0.8,<1" },
+    { name = "cloudcoil", extras = ["kubernetes", "operator"], marker = "extra == 'operator'" },
     { name = "cryptography", specifier = ">=46,<51" },
+    { name = "lib-opendefence-core", specifier = "==0.2.1+261010", index = "https://nexus.dev.pvarki.fi/repository/pypilocal/simple/" },
     { name = "pyjnius", marker = "extra == 'operator'", specifier = "==1.7.0" },
     { name = "starlette", specifier = ">=0.49,<1" },
     { name = "uvicorn", specifier = ">=0.38,<1" },

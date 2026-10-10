@@ -13,8 +13,6 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_LINK_MODE=copy
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN apt-get update && apt-get install -y --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/*
 RUN uv sync --locked --no-dev --no-editable
 
 FROM build AS api-test

@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from datetime import tzinfo
 
-from cloudcoil.apimachinery import ObjectMeta
+from cloudcoil.apimachinery import ObjectMeta, Time
 from cloudcoil.errors import APIError
 import pytest
 import httpx
@@ -19,25 +19,30 @@ from opendefence_integration_tak.operator import (
     input_revision,
     set_condition,
 )
-from opendefence_integration_tak.resources import (
-    BindingSpec,
-    BindingStatus,
-    Condition,
-    CoreModel,
+from lib_opendefence_core.models.v1alpha1 import (
+    BindingObservation,
     Group,
     GroupSpec,
-    Reference,
+    ObjectRef,
     Role,
     RoleSpec,
     User,
     UserBinding,
+    UserBindingSpec,
+    UserBindingStatus,
     UserSpec,
+    UserStatus,
 )
+from lib_opendefence_core.models.v1alpha1.common import PlatformCondition
 from tests.kubernetes import KubernetesFixture
 
 
 def core_user() -> User:
-    return User(metadata=ObjectMeta(name="person", uid="original-user", generation=1), spec=UserSpec(callsign="FIRST"))
+    return User(
+        kind="User",
+        metadata=ObjectMeta(name="person", uid="original-user", generation=1),
+        spec=UserSpec(callsign="first"),
+    )
 
 
 class FixtureProjector:
@@ -50,7 +55,7 @@ class FixtureProjector:
         if self.failure:
             raise RuntimeError("fixture partial write")
         if self.mutate is not None:
-            self.mutate.spec.callsign = "CHANGED"
+            self.mutate.spec.callsign = "changed"
         return self.receipt or ProjectionReceipt(
             revision, "strict-v1", "strict-v1", "strict-v1", datetime.now(UTC) + timedelta(minutes=5)
         )
@@ -73,7 +78,7 @@ def reconciler(projector: FixtureProjector | UnavailableProjector) -> tuple[Bind
     )
 
 
-def condition(binding: UserBinding) -> Condition:
+def condition(binding: UserBinding) -> PlatformCondition:
     assert binding.status is not None
     return next(item for item in binding.status.conditions if item.type == "Synced")
 
@@ -201,33 +206,57 @@ def test_foreign_binding_is_preserved(change: str) -> None:
 
 def test_input_revisions_ignore_binding_feedback_and_track_references() -> None:
     user = core_user()
-    user.status = CoreModel(publicKey="current", bindings=[{"synced": False}])
+    observation = BindingObservation(name="binding", namespace="tak", uid="binding-uid", synced=False)
+    user.status = UserStatus(publicKey="current", bindings=[observation], observedGeneration=1)
     original = input_revision(user, [], [])
-    user.status = CoreModel(publicKey="current", bindings=[{"synced": True}])
+    user.status = UserStatus(
+        publicKey="current",
+        bindings=[observation.model_copy(update={"synced": True})],
+        observedGeneration=2,
+        conditions=[
+            PlatformCondition(
+                type="BindingsSynced",
+                status="True",
+                reason="Synced",
+                message="Synced",
+                lastTransitionTime=Time(datetime.now(UTC)),
+            )
+        ],
+    )
     assert input_revision(user, [], []) == original
-    group = Group(metadata=ObjectMeta(name="group", uid="group-uid"), spec=GroupSpec(name="group", displayName="Group"))
-    role = Role(metadata=ObjectMeta(name="role", uid="role-uid"), spec=RoleSpec(name="role", displayName="Role"))
+    user.status.public_key = "changed"
+    assert input_revision(user, [], []) != original
+    group = Group(
+        kind="Group",
+        metadata=ObjectMeta(name="group", uid="group-uid"),
+        spec=GroupSpec(name="group", displayName="Group"),
+    )
+    role = Role(
+        kind="Role", metadata=ObjectMeta(name="role", uid="role-uid"), spec=RoleSpec(name="role", displayName="Role")
+    )
     revision = input_revision(user, [group], [role])
-    group.spec.parent_ref = Reference(name="parent")
+    group.spec.parent_ref = ObjectRef(name="parent")
     assert input_revision(user, [group], [role]) != revision
+    revision = input_revision(user, [group], [role])
     role.spec.display_name = "Changed role"
-    assert input_revision(user, [group], [role]) != original
+    assert input_revision(user, [group], [role]) != revision
 
 
 def test_conditions_preserve_other_writers_and_transition_time() -> None:
     now = datetime.now(UTC)
-    other = Condition(type="Other", status="True", reason="Okay", message="Okay", lastTransitionTime=now)
+    other = PlatformCondition(type="Other", status="True", reason="Okay", message="Okay", lastTransitionTime=Time(now))
     binding = UserBinding(
+        kind="UserBinding",
         metadata=ObjectMeta(generation=1),
-        spec=BindingSpec(userRef=Reference(name="person")),
-        status=BindingStatus(conditions=[other]),
+        spec=UserBindingSpec(userRef=ObjectRef(name="person")),
+        status=UserBindingStatus(conditions=[other]),
     )
     assert set_condition(binding, False, "Unavailable", now)
     assert not set_condition(binding, False, "Unavailable", now + timedelta(seconds=1))
     assert set_condition(binding, False, "ChangedReason", now + timedelta(seconds=2))
-    assert condition(binding).last_transition_time == now
+    assert condition(binding).last_transition_time.root == now
     assert set_condition(binding, True, "Okay", now + timedelta(seconds=3))
-    assert condition(binding).last_transition_time == now + timedelta(seconds=3)
+    assert condition(binding).last_transition_time.root == now + timedelta(seconds=3)
     assert binding.status and other in binding.status.conditions
 
 
@@ -244,7 +273,7 @@ def test_scan_and_conflict_retry() -> None:
 
 
 def test_missing_resource_identity() -> None:
-    user = User(spec=UserSpec(callsign="Test"))
+    user = User(kind="User", spec=UserSpec(callsign="test"))
     with pytest.raises(ValueError):
         binding_name(user)
     with pytest.raises(ValueError):

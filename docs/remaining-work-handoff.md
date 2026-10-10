@@ -9,6 +9,8 @@ Initial binary probe checkpoint: `67b94e2`. Later probe evidence is in [the curr
 The foundation and pure full-setup package builder are implemented.
 The seven REST operations, Secret-backed grants and UserBinding reconciliation are implemented.
 Production Core authorization and strict TAK JNI adapters remain unavailable.
+Core CRD resource readers now use `lib-opendefence-core==0.2.1+261010` from Nexus;
+the installed CRD and existing User callsigns must satisfy its narrower callsign pattern.
 See [API and operator](api-operator.md) for behavior and adapter contracts.
 I1 is incomplete. I2 is partial. The integration is not release-ready.
 Continue independent work when its inputs are available.

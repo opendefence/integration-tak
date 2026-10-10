@@ -6,7 +6,9 @@ I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe is complete and proves an approved-set failure.
 I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
-Core CRD shapes and UserBinding ownership are supplied. Production authorization and credential adapters still need semantic contracts.
+Core CRD shapes and UserBinding ownership are supplied. The operator uses
+`lib-opendefence-core==0.2.1+261010` models from the user-supplied Nexus index.
+Production authorization and credential adapters still need semantic contracts.
 The integration is not release-ready.
 
 | Gate | Required setting | Confirmation |
@@ -75,7 +77,7 @@ Keep JNI dependencies in the operator extra. Keep PyJNIus pinned to `1.7.0`.
 The images print help by default. Separate `api` and `operator` commands now start the workload processes.
 Production authority and JNI projection adapters are not enabled.
 Publishing and Snyk remain disabled until their repository variables enable them.
-Do not copy prototype Core models or server deployments.
+Use the shared Core models; do not copy prototype models or server deployments.
 
 The package builder accepts explicit inputs and already-issued material.
 It builds full setup for ATAK, ATAK Mini, iTAK, WinTAK, and TAK Tracker.
@@ -144,6 +146,17 @@ See [API and operator](api-operator.md) for the internal seams and exact remaini
 - `kubectl kustomize k8s/integration` and `git diff --check` passed. No resources were applied.
 - Inline Ponytail review covered ownership, secret delivery, freshness, CAS races, token rotation and restore. Readiness validation, receipt expiry and routing defects were fixed. No remaining defects were found within this implemented application slice; the production gaps remain blockers.
 - Sanitized evidence: [I2 API/operator checks](evidence/i2-api-operator.txt). The cumulative audit remains I5 work.
+
+The subsequent Core model migration replaces local v1alpha1 resource classes with
+`lib-opendefence-core==0.2.1+261010` from the Nexus `pypilocal` index.
+It also resolves the library's required Cloudcoil 0.8 from PyPI and keeps the
+grant-store Secret model local. The lock pins the library wheel SHA-256.
+The Java container passed 265 tests with no skips (96.42% coverage with branches enabled);
+the focused local operator suite passed 19 tests. All-file prek checks, including
+Pyrefly, Bandit and lock validation, passed. Both ARM64 runtime images built;
+the API import boundary and native operator JNI checks passed without network.
+The package enforces a callsign pattern absent from the supplied CRD snapshot;
+see [Core contracts](core-contracts.md) before cluster deployment.
 
 Image tags use `i2-http-operator`, all `linux/arm64`:
 

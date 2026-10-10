@@ -12,7 +12,7 @@ from starlette.applications import Starlette
 
 from opendefence_integration_tak import console, operator, runtime
 from opendefence_integration_tak.api import PREFIX
-from opendefence_integration_tak.resources import UserBinding
+from lib_opendefence_core.models.v1alpha1 import UserBinding
 from tests.kubernetes import KubernetesFixture
 from tests.test_operator import core_user, condition
 

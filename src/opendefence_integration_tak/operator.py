@@ -8,23 +8,24 @@ import logging
 import time
 from typing import Protocol
 
-from cloudcoil.apimachinery import ObjectMeta, OwnerReference
+from cloudcoil.apimachinery import ObjectMeta, OwnerReference, Time
 from cloudcoil.client import APIClient
 from cloudcoil.errors import APIError, ResourceConflict, ResourceNotFound
 import httpx
 
 from opendefence_integration_tak.cluster import cluster_config
 
-from opendefence_integration_tak.resources import (
-    BindingSpec,
-    BindingStatus,
-    Condition,
+from lib_opendefence_core.models.v1alpha1 import (
+    API_VERSION,
     Group,
-    Reference,
+    ObjectRef,
     Role,
     User,
     UserBinding,
+    UserBindingSpec,
+    UserBindingStatus,
 )
+from lib_opendefence_core.models.v1alpha1.common import PlatformCondition
 
 _LABEL = "app.kubernetes.io/managed-by"
 _MANAGER = "opendefence-integration-tak"
@@ -88,7 +89,7 @@ def input_revision(user: User, groups: list[Group], roles: list[Role]) -> str:
     user_value = identity(user)
     empty_status: dict[str, object] = {}
     user_value["status"] = (
-        user.status.model_dump(mode="json", exclude={"bindings", "conditions", "observedGeneration"})
+        user.status.model_dump(mode="json", by_alias=True, exclude={"bindings", "conditions", "observed_generation"})
         if user.status
         else empty_status
     )
@@ -108,15 +109,15 @@ def binding_name(user: User) -> str:
 
 def set_condition(binding: UserBinding, synced: bool, reason: str, now: datetime) -> bool:
     generation = binding.metadata.generation if binding.metadata else None
-    status = binding.status or BindingStatus()
+    status = binding.status or UserBindingStatus()
     current = next((item for item in status.conditions if item.type == "Synced"), None)
     desired = "True" if synced else "False"
-    condition = Condition(
+    condition = PlatformCondition(
         type="Synced",
         status=desired,
         reason=reason,
         message=reason,
-        lastTransitionTime=current.last_transition_time if current and current.status == desired else now,
+        lastTransitionTime=current.last_transition_time if current and current.status == desired else Time(now),
         observedGeneration=generation,
     )
     replacement = [item for item in status.conditions if item.type != "Synced"] + [condition]
@@ -147,13 +148,14 @@ class BindingReconciler:
         except ResourceNotFound:
             binding = self.bindings.create(
                 UserBinding(
+                    kind="UserBinding",
                     metadata=ObjectMeta(
                         name=binding_name(user),
                         namespace=self.namespace,
                         labels={_LABEL: _MANAGER},
                         owner_references=[
                             OwnerReference(
-                                api_version=user.api_version,
+                                api_version=API_VERSION,
                                 kind="User",
                                 name=user.name,
                                 uid=user.metadata.uid,
@@ -161,7 +163,7 @@ class BindingReconciler:
                             )
                         ],
                     ),
-                    spec=BindingSpec(userRef=Reference(name=user.name)),
+                    spec=UserBindingSpec(userRef=ObjectRef(name=user.name)),
                 )
             )
         owners = binding.metadata.owner_references if binding.metadata else None
