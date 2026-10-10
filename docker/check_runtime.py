@@ -19,6 +19,7 @@ def main() -> None:
     assert sys.version_info[:2] == (3, 14), sys.version
     assert sys.prefix == "/opt/venv", sys.prefix
     importlib.import_module("odintegration_tak.console")
+    importlib.import_module("odintegration_tak.packages")
     assert "jnius" not in sys.modules
     for tool in ("javac", "gcc", "uv", "uvx", "pip", "pip3"):
         assert shutil.which(tool) is None, f"Build tool in runtime: {tool}"

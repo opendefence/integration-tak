@@ -13,5 +13,6 @@ build
 htmlcov
 pytest*.xml
 docs
+spikes
 integration-tak-implementation-handoff.md
 tak-package-api.openapi.json

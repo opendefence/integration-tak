@@ -1,9 +1,10 @@
 # OpenDefence TAK integration
 
 This repository contains the `odintegration_tak` project.
-The project is at the foundation stage.
+The project contains foundation tooling and a pure client package builder.
 The operator and delivery API are not implemented yet.
 See `docs/implementation-status.md` for stage gates and blockers.
+See [package construction](docs/packages.md) and [PKCS#12 export](docs/certificates.md) for the available Python functions.
 
 ## Development
 
@@ -12,12 +13,17 @@ Run `uv sync --locked` to install the development environment without JNI.
 Run `uv run --locked prek install` to install the Git hooks.
 Run `uv run --locked prek run --all-files` to check the files.
 Run `uv run --locked pytest` to test the package.
+Run the separate `package-test` image to require Java compatibility checks.
 Run `uv build --no-sources` to build the distributions.
 Run `uv run --locked odintegration-tak --help` to inspect the CLI.
 
 Install the operator extra only in an environment with Java 17 and JNI headers.
 Use `uv sync --locked --extra operator` in that environment.
 Package imports, help and version output must not start a JVM.
+
+The package builder exports already-issued material.
+It does not authorize delivery or create accounts, keys, or certificates.
+Credential-update delivery remains disabled until client tests establish a supported method.
 
 ## Source foundation
 
