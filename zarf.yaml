@@ -1,0 +1,128 @@
+kind: ZarfPackageConfig
+metadata:
+  name: integration-tak
+  version: "0.1.0+261011"
+  description: OpenDefence TAK integration API, operator, and server
+constants:
+  - name: TAK_IMAGE
+    value: "###ZARF_PKG_TMPL_TAK_IMAGE###"
+    pattern: "^(.+@sha256:[a-f0-9]{64}|localhost/tak-server:local)$"
+  - name: API_IMAGE
+    value: "###ZARF_PKG_TMPL_API_IMAGE###"
+    pattern: '^[A-Za-z0-9._:/@-]+$'
+  - name: OPERATOR_IMAGE
+    value: "###ZARF_PKG_TMPL_OPERATOR_IMAGE###"
+    pattern: '^[A-Za-z0-9._:/@-]+$'
+variables:
+  - name: PUBLIC_ORIGIN
+    pattern: '^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?$'
+  - name: TAK_SERVER_ADDRESS
+    pattern: '^[A-Za-z0-9][A-Za-z0-9.-]*$'
+  - name: LDAP_UPDATE_INTERVAL
+    default: "60"
+    pattern: '^[1-9][0-9]*$'
+  - name: TAK_IGNITE_POOL_SIZE
+    default: "2"
+    pattern: '^[0-9]+$'
+  - name: TAK_IGNITE_CACHE_INITIAL_BYTES
+    default: "16777216"
+    pattern: '^[0-9]+$'
+  - name: TAK_IGNITE_CACHE_MAX_BYTES
+    default: "268435456"
+    pattern: '^[0-9]+$'
+  - name: CONFIG_MAX_HEAP
+    default: "128"
+    pattern: '^[0-9]+$'
+  - name: MESSAGING_MAX_HEAP
+    default: "512"
+    pattern: '^[0-9]+$'
+  - name: API_MAX_HEAP
+    default: "512"
+    pattern: '^[0-9]+$'
+  - name: JAVA_TOOL_OPTIONS
+    default: "-XX:ActiveProcessorCount=2"
+    pattern: '^[A-Za-z0-9_./:=,+ -]+$'
+components:
+  - name: integration-local-dev
+    required: true
+    only: {flavor: local-dev}
+    images: ["###ZARF_PKG_TMPL_API_IMAGE###", "###ZARF_PKG_TMPL_OPERATOR_IMAGE###"]
+    manifests:
+      - name: integration-tak
+        namespace: integration-tak
+        template: true
+        kustomizations:
+          - k8s/overlays/local-dev
+    actions:
+      onDeploy:
+        after:
+          - description: Integration API to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-api, namespace: integration-tak, condition: Available}
+          - description: Integration administrator certificate to be issued
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: certificate, name: tak-integration-admin, namespace: integration-tak, condition: Ready}
+          - description: Integration operator to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-operator, namespace: integration-tak, condition: Available}
+  - name: integration-production
+    required: true
+    only: {flavor: production}
+    images: ["###ZARF_PKG_TMPL_API_IMAGE###", "###ZARF_PKG_TMPL_OPERATOR_IMAGE###"]
+    manifests:
+      - name: integration-tak
+        namespace: integration-tak
+        template: true
+        kustomizations:
+          - k8s/overlays/production
+    actions:
+      onDeploy:
+        after:
+          - description: Integration API to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-api, namespace: integration-tak, condition: Available}
+          - description: Integration operator to become available
+            maxTotalSeconds: 300
+            wait:
+              cluster: {kind: deployment, name: integration-tak-operator, namespace: integration-tak, condition: Available}
+  - name: tak-schema
+    required: true
+    images: ["###ZARF_PKG_TMPL_TAK_IMAGE###"]
+    manifests:
+      - name: tak-schema
+        namespace: integration-tak
+        kustomizations: [../tak-server/k8s/zarf/integrated-schema]
+    actions:
+      onDeploy:
+        after:
+          - description: TAK schema migration to complete
+            maxTotalSeconds: 900
+            wait:
+              cluster: {kind: job, name: tak-schema-5-8-92, namespace: integration-tak, condition: complete}
+  - name: tak-grants
+    required: true
+    images: ["###ZARF_PKG_TMPL_TAK_IMAGE###"]
+    manifests:
+      - name: tak-grants
+        namespace: integration-tak
+        kustomizations: [../tak-server/k8s/zarf/integrated-grants]
+    actions:
+      onDeploy:
+        after:
+          - description: TAK runtime grants to complete
+            maxTotalSeconds: 180
+            wait:
+              cluster: {kind: job, name: tak-grants-5-8-92, namespace: integration-tak, condition: complete}
+  - name: tak-server
+    required: true
+    images: ["###ZARF_PKG_TMPL_TAK_IMAGE###"]
+    manifests:
+      - name: tak-server
+        namespace: integration-tak
+        kustomizations: [../tak-server/k8s/zarf/integrated]
+    healthChecks:
+      - {apiVersion: apps/v1, kind: StatefulSet, name: tak-server, namespace: integration-tak}

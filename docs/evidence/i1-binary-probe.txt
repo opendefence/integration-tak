@@ -1,0 +1,49 @@
+I1 TAK 5.8.84 binary component probe
+Date: 2026-10-10
+
+Runtime:
+- TAK: 5.8-RELEASE-84, ARM64
+- Server image: localhost/tak-server:t1-5.8.84-pr136
+- Server image digest: sha256:a3c022ec0806378523ed86dc9949599fb3b5331cf4deb78293dd4ee9efd9fffe
+- takserver.war SHA-256: 64309513e45ba1e92084d457cd787b35d1c570ab918a11fd1ce1e5bdd4d6f26c
+- UserManager.jar SHA-256: 4ad7adcb9a09156d7122bfb2d4ddf3fd6705fb612f4d521335a5e08b449d24f6
+- JDK image: eclipse-temurin:17-jdk-noble@sha256:fb79620c3f6ee8f1c7530a8dc4fd49e3b410bcef037694ad4858a1553bac4170
+- Java: Temurin 17.0.20.1+1
+- Isolation: Podman --network none, tmpfs /work, read-only source and artifact mounts
+
+The probe generated one CA and four unique leaf certificates in tmpfs.
+The main, tak-only, and unapproved certificates used the same UUID CN.
+The other-uuid certificate used a different UUID CN.
+The fixture alternated the stored scalar fingerprint between main and tak-only.
+
+RESULT stored=main presented=main status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
+RESULT stored=main presented=tak-only status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
+RESULT stored=main presented=unapproved status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
+RESULT stored=main presented=other-uuid status=SUCCESS role_readonly=false role_anonymous=true group_names=[__ANON__] group_entries=2
+RESULT stored=tak-only presented=main status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
+RESULT stored=tak-only presented=tak-only status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
+RESULT stored=tak-only presented=unapproved status=SUCCESS role_readonly=true role_anonymous=false group_names=[fixture] group_entries=2
+RESULT stored=tak-only presented=other-uuid status=SUCCESS role_readonly=false role_anonymous=true group_names=[__ANON__] group_entries=2
+RESULT contact_update=DESIRED subscriptions=0
+RESULT next_cot_contact=CLIENT-NEXT desired_overwritten=true leaf_unchanged=true account_unchanged=true permissions_unchanged=true subscriptions=0
+RESULT approved_set_requirement=FAIL unapproved_same_uuid_received_role_and_groups
+
+Exit status: 0.
+The earlier authentication/contact-map probe passed twice after fixture repair.
+The extended probe above passed once with the same pinned JDK and WAR.
+The experimental T1 server image contains the same tested WAR and UserManager.jar checksums.
+
+Interpretation:
+- The binary matches the file-auth user when either its scalar fingerprint or identifier equals the presented identity.
+- The unapproved same-UUID certificate receives ROLE_READONLY and both fixture group directions.
+- The different-UUID certificate receives only the binary's ROLE_ANONYMOUS and __ANON__ group fallback.
+- Updating the contact map changes the stored contact name without changing the fixture certificate, UUID account, role, or group list.
+- Calling SubmissionService.processContactMessage with parsed CoT replaces DESIRED with CLIENT-NEXT and the fixture endpoint.
+- The certificate, UUID account, role, and group list remain unchanged after this replacement.
+
+Limits:
+- This is an in-process component test against actual WAR classes.
+- It invokes the private contact method through reflection without server initialization, routing, or UID authentication.
+- It does not perform a TLS handshake, start the TAK services, exchange CoT over a network, or test session resumption.
+- It does not prove a durable callsign change, live subscription update, peer display, restart, or approved-set enforcement.
+- Generated keys and certificates were not retained.

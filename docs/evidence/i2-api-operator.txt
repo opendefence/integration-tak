@@ -1,0 +1,89 @@
+I2 HTTP and binding checkpoint
+Date: 2026-10-10
+Branch: feat/i0-foundation
+Implementation commit: 3739c08
+Model gate: user confirmed "Switched; resume I2"; required gpt-6.1-sol / high.
+Scope: application tests and runtime boundaries; no live Core or TAK authorization acceptance.
+
+Final verification:
+podman build --target package-test -t localhost/opendefence-integration-tak-package:i2-http-operator .
+podman run --rm --network none localhost/opendefence-integration-tak-package:i2-http-operator
+RESULT: 265 passed, no skips, 96.57% coverage including branches.
+The image requires Java 17 keytool; both RSA and EC compatibility checks passed.
+One upstream Starlette/AnyIO BlockingPortal deprecation warning remains.
+
+Before the final redirect-slash change, local Python 3.14.7 verification:
+uv run --locked pytest -q
+RESULT: 263 passed, two keytool skips, 96.56% coverage.
+The final Java container verifies the later routing change and both skipped checks.
+
+uv run --locked prek run --all-files
+RESULT: all applicable checks passed, including Ruff, strict Pyrefly, Bandit,
+secret scan, lockfile, JSON/YAML checks and formatting.
+The feature commit's normal pre-commit and Conventional Commit hooks passed.
+
+uv build --no-sources
+RESULT: wheel and source distribution built successfully.
+kubectl kustomize k8s/integration
+RESULT: local manifest rendering passed; no apply or context selection.
+git diff --check
+RESULT: passed.
+
+Runtime targets built:
+podman build --target api -t localhost/opendefence-integration-tak-api:i2-http-operator .
+podman build --target operator -t localhost/opendefence-integration-tak-operator:i2-http-operator .
+RESULT: both passed, linux/arm64.
+
+API boundary, docker/check_runtime.py api:
+API: Python 3.14; no JVM, JNI, TAK artifacts or build tools.
+API --version: opendefence-integration-tak 0.1.0
+API subcommand --help: passed; namespace and HTTPS public origin required.
+
+Operator boundary, docker/check_runtime.py operator:
+TAK: 5.8-RELEASE-69
+JRE: 17.0.20.1+1
+JAR SHA-256: 329c3831d0550bef309a7c77ff29c3b398279f973bc9789e0db5c26817ac39c7
+Operator: Python 3.14; native JNI call passed; build tools absent.
+Operator subcommand --help: passed; namespace required.
+This is the I0 runtime tuple, not final 5.8.84 strict-server compatibility.
+
+Final image manifest digests:
+package: sha256:4007f35e04f4c5ab69ed3b846f6cc7eea35805a858fb0ac871e0a517e14d9a0f
+api: sha256:f66f3e821d098080414d990338429bacf64f8b4a0f116de0e00ebad9eb1fcc08
+operator: sha256:61cbc39ed290cb39a2a706957d351436cd61f8dc9ddc7d898d714db026a4a121
+
+Application proof:
+- Seven ASGI operations use the existing full-package builder.
+- OpenAPI response schemas, live checks before ETag, owner isolation and denial passed.
+- Malformed key, certificate, trust, identity and connection inputs cannot report ready.
+- Update delivery stays disabled; invalid selector combinations, including null selectors, are rejected.
+- Grant hashes, expiry caps, reuse, deletion, restore UID changes and stale generation checks passed.
+- Two actual concurrent fixture HTTP clients cannot exceed the owner grant limit.
+- Secret resourceVersion conflicts retry; exhausted retries fail without partial document publication.
+- Deletion during rendering blocks the final release decision.
+- Rendering concurrency is bounded; adapter exception values are redacted.
+- Projected service-account tokens refresh on both Kubernetes transports; token loss sends no stale fallback.
+- Bindings preserve ownership and other conditions; User recreation changes the binding identity.
+- Missing authority, partial projection, stale readback and receipt expiry cannot publish Synced=True.
+- Runtime launch tests use actual Cloudcoil discovery over an explicit HTTP fixture, without JNI or a live cluster.
+
+Review:
+Inline Ponytail review traced callers, storage, ownership, readiness, concurrency and runtime configuration.
+Readiness, timing, token refresh, selector validation and routing defects were fixed and checked.
+No remaining defects found within the application slice. Production dependencies remain open.
+This is not the I5 cumulative audit or a production authorization review.
+
+Remaining release inputs:
+Core immutable identity, effective permissions, approved inventory, export and HTTP authority semantics;
+strict server management/JNI capability and both-JVM enforcement; durable activation reporting;
+trusted ingress isolation, versioned server-base composition, live deployment and real client tests.
+Default authority returns 503; default projector leaves Synced=False.
+No live grants may be restored: exclude the Secret from backups and recreate it empty.
+An in-place restore preserving its UID is not a supported restore procedure.
+
+Owned state:
+Only local images, test/build containers and distribution artifacts were created.
+Test containers used --rm and --network none.
+No cluster context, Kubernetes resources, PVCs, registry publication or sibling server files changed.
+Original untracked handoff and OpenAPI inputs were preserved.
+No raw tokens, certificates, private keys, ZIPs or kubeconfigs are included in this evidence.

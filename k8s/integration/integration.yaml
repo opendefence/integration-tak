@@ -1,0 +1,16 @@
+apiVersion: platform.opendefence.fi/v1alpha1
+kind: Integration
+metadata:
+  name: integration-tak
+spec:
+  displayName: TAK
+  version: "0.1.0+261011"
+  productInfo:
+    descriptions:
+      - language: en
+        title: Team Awareness Kit
+        description: TAK Server and client connection packages.
+  extraRoles: []
+  networkPolicy:
+    ingress: Public
+    egress: Cluster

@@ -1,0 +1,1673 @@
+{
+  "components": {
+    "parameters": {
+      "BaseRevision": {
+        "description": "Required only for credential-update. Resolve against authorized bounded package/rotation history, never a client-supplied credential or Secret reference.",
+        "in": "query",
+        "name": "baseRevision",
+        "required": false,
+        "schema": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "CompatibilityId": {
+        "description": "Required only for credential-update; one current validated rotation method from the profile catalog for the actual client/version/platform/import route.",
+        "in": "query",
+        "name": "compatibilityId",
+        "required": false,
+        "schema": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "FileName": {
+        "description": "Cosmetic safe filename; never chooses a user, profile, credential or filesystem path.",
+        "in": "path",
+        "name": "fileName",
+        "required": true,
+        "schema": {
+          "maxLength": 160,
+          "minLength": 5,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.zip$",
+          "type": "string"
+        }
+      },
+      "GrantId": {
+        "in": "path",
+        "name": "grantId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/GrantId"
+        }
+      },
+      "IfNoneMatch": {
+        "description": "Opaque metadata ETag. Authentication/authorization and live policy checks still run before 304.",
+        "in": "header",
+        "name": "If-None-Match",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ProfileId": {
+        "in": "path",
+        "name": "profileId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ProfileId"
+        }
+      },
+      "UserId": {
+        "in": "path",
+        "name": "userId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/UserId"
+        }
+      },
+      "Variant": {
+        "description": "full by default. credential-update requires baseRevision and compatibilityId and omits callsign and unrelated preferences.",
+        "in": "query",
+        "name": "variant",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/PackageVariant"
+        }
+      }
+    },
+    "responses": {
+      "Forbidden": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "The authenticated principal cannot perform this self-service operation.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InvalidInput": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "A non-secret request field is invalid.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "Not found, not owned, or invalid/expired/revoked download grant. No identity or capability disclosure.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NotReady": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "Package inputs or current reconciliation are not ready. The request does not trigger issuance. Also covers update-not-supported for an unknown, foreign or incompatible baseline, unverified compatibility method or non-ready rotation; offer a full package where authorized.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested retry delay in seconds.",
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "A request or active-grant limit was reached.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested retry delay in seconds.",
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "A verified Core-approved mTLS principal is required.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "description": "Authoritative state or required material could not be obtained; authorization fails closed.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          },
+          "Retry-After": {
+            "description": "Suggested retry delay in seconds.",
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Zip": {
+        "content": {
+          "application/zip": {
+            "schema": {
+              "format": "binary",
+              "type": "string"
+            }
+          }
+        },
+        "description": "Full or validated credential-update ZIP using the exact approved keypair. Preserve Java-compatible PKCS#12 encoding and stable internal .p12 paths across rotation; a unique outer ZIP name is independent. Full packages carry current desired callsign. Credential updates omit callsign and unrelated settings and include only the verified client-required import payload. No issuance, renewal or activation occurs. Range is ignored; success is a full 200.",
+        "headers": {
+          "Cache-Control": {
+            "description": "Always no-store for user-specific data and credential delivery.",
+            "schema": {
+              "const": "no-store",
+              "type": "string"
+            }
+          },
+          "Content-Disposition": {
+            "description": "attachment; safe unique filename ending in .zip",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "Referrer-Policy": {
+            "schema": {
+              "const": "no-referrer",
+              "type": "string"
+            }
+          },
+          "X-Content-Type-Options": {
+            "schema": {
+              "const": "nosniff",
+              "type": "string"
+            }
+          },
+          "X-Package-Revision": {
+            "description": "Credential/connection/trust input revision delivered; not proof of device installation.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "X-Package-Variant": {
+            "schema": {
+              "$ref": "#/components/schemas/PackageVariant"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ClientPackage": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "ready"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "takAuthorization": {
+                  "properties": {
+                    "state": {
+                      "const": "ready"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "credential"
+              ]
+            }
+          }
+        ],
+        "properties": {
+          "callsign": {
+            "type": "string"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/Credential"
+          },
+          "credentialUpdate": {
+            "$ref": "#/components/schemas/CredentialUpdate"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "content": {
+                "format": "uri-reference",
+                "type": "string"
+              },
+              "downloadGrants": {
+                "format": "uri-reference",
+                "type": "string"
+              }
+            },
+            "required": [
+              "content",
+              "downloadGrants"
+            ],
+            "type": "object"
+          },
+          "profileId": {
+            "$ref": "#/components/schemas/ProfileId"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revision": {
+            "description": "Opaque credential/connection/trust input revision, stable across a callsign-only edit. The metadata ETag also covers mutable callsign and status fields.",
+            "type": "string"
+          },
+          "rotation": {
+            "$ref": "#/components/schemas/Rotation"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "pending",
+              "degraded"
+            ],
+            "type": "string"
+          },
+          "takAuthorization": {
+            "$ref": "#/components/schemas/TakAuthorization"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "required": [
+          "userId",
+          "profileId",
+          "state",
+          "callsign",
+          "revision",
+          "links",
+          "takAuthorization",
+          "credentialUpdate",
+          "rotation"
+        ],
+        "type": "object"
+      },
+      "CreateDownloadGrant": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "baseRevision"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "compatibilityId"
+                    ]
+                  }
+                ]
+              }
+            },
+            "if": {
+              "properties": {
+                "variant": {
+                  "const": "credential-update"
+                }
+              },
+              "required": [
+                "variant"
+              ]
+            },
+            "then": {
+              "required": [
+                "baseRevision",
+                "compatibilityId"
+              ]
+            }
+          }
+        ],
+        "description": "Server may shorten but never extend the requested lifetime. Defaults to a full package. A credential-update requires the known predecessor revision and an exact validated client compatibility ID. Invalid field combinations return 422; unsupported baseline/method returns 409.",
+        "properties": {
+          "baseRevision": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "compatibilityId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "default": 300,
+            "maximum": 300,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PackageVariant"
+          }
+        },
+        "type": "object"
+      },
+      "CreatedDownloadGrant": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "baseRevision"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "compatibilityId"
+                    ]
+                  }
+                ]
+              }
+            },
+            "if": {
+              "properties": {
+                "variant": {
+                  "const": "credential-update"
+                }
+              },
+              "required": [
+                "variant"
+              ]
+            },
+            "then": {
+              "required": [
+                "baseRevision",
+                "compatibilityId"
+              ]
+            }
+          }
+        ],
+        "properties": {
+          "baseRevision": {
+            "type": "string"
+          },
+          "compatibilityId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "description": "Secret URL disclosed only in this creation response. HTTPS, configured public origin, current API prefix; percent-encode the whole URL when nesting inside tak:// import parameters.",
+            "format": "uri",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/GrantId"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "self": {
+                "format": "uri-reference",
+                "type": "string"
+              }
+            },
+            "required": [
+              "self"
+            ],
+            "type": "object"
+          },
+          "profileId": {
+            "$ref": "#/components/schemas/ProfileId"
+          },
+          "reusableUntilExpiry": {
+            "const": true,
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "revoked",
+              "expired"
+            ],
+            "type": "string"
+          },
+          "targetRevision": {
+            "description": "Bound credential/connection/trust inputs; mutable callsign may be freshly rendered only in full packages.",
+            "type": "string"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PackageVariant"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "profileId",
+          "credentialId",
+          "createdAt",
+          "expiresAt",
+          "state",
+          "reusableUntilExpiry",
+          "links",
+          "downloadUrl",
+          "variant",
+          "targetRevision"
+        ],
+        "type": "object"
+      },
+      "Credential": {
+        "additionalProperties": false,
+        "description": "The single immutable credential generation exported in this package. It is not the complete TAK acceptance set. No Secret reference, certificate PEM or private key appears in JSON.",
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "main",
+              "tak-client"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "reused-main",
+              "tak-generated"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "purpose",
+          "source",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "CredentialUpdate": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "available"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "compatibilityIds": {
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "baseRevision",
+                "targetRevision"
+              ]
+            }
+          }
+        ],
+        "description": "An update requires a known compatible baseline and a selected validated compatibility ID. Unknown/drifted devices use an explicit full-package or manual fallback; do not infer settings preservation.",
+        "properties": {
+          "baseRevision": {
+            "description": "Known predecessor package input revision. This is not proof that any device installed it.",
+            "type": "string"
+          },
+          "compatibilityIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "available",
+              "unsupported",
+              "baseline-required",
+              "not-needed"
+            ],
+            "type": "string"
+          },
+          "targetRevision": {
+            "description": "Replacement credential/connection/trust input revision, independent of mutable callsign presentation.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "compatibilityIds"
+        ],
+        "type": "object"
+      },
+      "DownloadGrant": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "baseRevision"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "compatibilityId"
+                    ]
+                  }
+                ]
+              }
+            },
+            "if": {
+              "properties": {
+                "variant": {
+                  "const": "credential-update"
+                }
+              },
+              "required": [
+                "variant"
+              ]
+            },
+            "then": {
+              "required": [
+                "baseRevision",
+                "compatibilityId"
+              ]
+            }
+          }
+        ],
+        "description": "No raw token or download URL is returned by GET. A callsign change alone does not invalidate this grant; credential/configuration/trust changes may do so. Variant, baseline, target credential/material revision and compatibility ID are immutable. Credential-update packages do not reset callsign or unrelated preferences.",
+        "properties": {
+          "baseRevision": {
+            "type": "string"
+          },
+          "compatibilityId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/GrantId"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "self": {
+                "format": "uri-reference",
+                "type": "string"
+              }
+            },
+            "required": [
+              "self"
+            ],
+            "type": "object"
+          },
+          "profileId": {
+            "$ref": "#/components/schemas/ProfileId"
+          },
+          "reusableUntilExpiry": {
+            "const": true,
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "revoked",
+              "expired"
+            ],
+            "type": "string"
+          },
+          "targetRevision": {
+            "description": "Bound credential/connection/trust inputs; mutable callsign may be freshly rendered only in full packages.",
+            "type": "string"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/PackageVariant"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "profileId",
+          "credentialId",
+          "createdAt",
+          "expiresAt",
+          "state",
+          "reusableUntilExpiry",
+          "links",
+          "variant",
+          "targetRevision"
+        ],
+        "type": "object"
+      },
+      "GrantId": {
+        "description": "Opaque random grant identifier; not a capability by itself.",
+        "pattern": "^[A-Za-z0-9_-]{22}$",
+        "type": "string"
+      },
+      "PackageProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "enum": [
+              "atak",
+              "atak-mini",
+              "itak",
+              "wintak",
+              "tak-tracker"
+            ],
+            "type": "string"
+          },
+          "rotationCompatibility": {
+            "$ref": "#/components/schemas/RotationCompatibility"
+          },
+          "title": {
+            "type": "string"
+          },
+          "validatedClients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "validationStatus": {
+            "enum": [
+              "implemented",
+              "device-validated"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "version",
+          "validationStatus",
+          "validatedClients",
+          "rotationCompatibility"
+        ],
+        "type": "object"
+      },
+      "PackageVariant": {
+        "default": "full",
+        "enum": [
+          "full",
+          "credential-update"
+        ],
+        "type": "string"
+      },
+      "Problem": {
+        "additionalProperties": false,
+        "description": "Problem Details. Never include token values, private material, or internal Secret names.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "format": "uri-reference",
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "status": {
+            "maximum": 599,
+            "minimum": 400,
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "format": "uri-reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
+        "type": "object"
+      },
+      "ProfileId": {
+        "enum": [
+          "atak",
+          "atak-mini",
+          "itak",
+          "wintak",
+          "tak-tracker"
+        ],
+        "type": "string"
+      },
+      "Rotation": {
+        "additionalProperties": false,
+        "description": "Read-only Core-owned rotation status. Core confirms main-certificate rotation from its own authenticated connection with the new main certificate. Only for a separately issued TAK-only keypair, the trusted observer confirms the first established authenticated TAK connection whose peer-certificate SHA-256 fingerprint matches that active rotation successor. Core then durably and idempotently revokes the mapped predecessor; no manual acknowledgement, CoT transaction or HTTPS probe is required. This is per replacement credential, not proof that all devices sharing the key migrated. A download or client-reported fingerprint is insufficient. An observed main-browser login does not confirm a separate TAK keypair. No silent pre-confirmation retirement timer. Expiry, authorization loss and emergency revocation remain independent. A CA revocation result is separate from OCSP/TAK enforcement. limited explicitly reports a selected asynchronous-session guard or uncovered session behavior, never a zero-traffic guarantee.",
+        "properties": {
+          "affectedPurposes": {
+            "items": {
+              "enum": [
+                "main",
+                "tak-client"
+              ],
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "clientVerification": {
+            "enum": [
+              "not-required",
+              "pending",
+              "verified",
+              "unobservable"
+            ],
+            "type": "string"
+          },
+          "confirmationMethod": {
+            "description": "Separate TAK-only keypair rotation uses the first live authenticated TAK connection with the exact approved successor fingerprint. Core-authenticated-use exclusively confirms main-certificate rotation, including when the package reuses that main keypair; operator-verified is an explicit exceptional fallback, never a required additional approval.",
+            "enum": [
+              "tak-connection-fingerprint",
+              "core-authenticated-use",
+              "operator-verified"
+            ],
+            "type": "string"
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedCredentialId": {
+            "description": "Exact immutable successor generation observed, not an inferred main/TAK credential cohort.",
+            "type": "string"
+          },
+          "enforcementState": {
+            "enum": [
+              "not-applicable",
+              "pending",
+              "verified",
+              "limited",
+              "degraded"
+            ],
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "none",
+              "staging",
+              "available",
+              "awaiting-confirmation",
+              "revoking",
+              "enforcement-pending",
+              "complete",
+              "recovery-required",
+              "degraded"
+            ],
+            "type": "string"
+          },
+          "revocationRequestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revocationState": {
+            "enum": [
+              "not-requested",
+              "pending",
+              "revoked",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "targetCredentialId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase",
+          "affectedPurposes",
+          "clientVerification",
+          "revocationState",
+          "enforcementState"
+        ],
+        "type": "object"
+      },
+      "RotationCompatibility": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "unverified"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "methods": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "device-validated"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "methods": {
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        ],
+        "description": "Initial value: unverified and an empty methods list. Full-package initial import validation does not certify rotation.",
+        "properties": {
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/ValidatedRotationMethod"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "unverified",
+              "device-validated"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "methods"
+        ],
+        "type": "object"
+      },
+      "TakAuthorization": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialIds": {
+            "description": "Core-approved credential generations, including the main public certificate when its private key is unavailable and any TAK-only credential. All map to one User UUID and desired callsign; Core owns their fingerprints and lifecycle.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "revision": {
+            "description": "Opaque desired acceptance-set and permission revision; ready means this exact revision is verified on TAK.",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "pending",
+              "degraded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "revision",
+          "credentialIds"
+        ],
+        "type": "object"
+      },
+      "UserId": {
+        "description": "Core User UUID: accept canonical UUID text or unpadded 22-character Base64URL; normalize before authorization and emit compact Base64URL. Backing ID source is a Core contract decision.",
+        "pattern": "^(?:[A-Za-z0-9_-]{22}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+        "type": "string"
+      },
+      "ValidatedRotationMethod": {
+        "additionalProperties": false,
+        "description": "Only populated after the existing-server rotation acceptance matrix passes for this exact client/version/platform and import route.",
+        "properties": {
+          "client": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable compatibility ID selected explicitly by the caller; not inferred from the browser User-Agent.",
+            "type": "string"
+          },
+          "importRoutes": {
+            "items": {
+              "enum": [
+                "file-import",
+                "tak-deep-link"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "method": {
+            "enum": [
+              "keystore-only",
+              "connection-scoped"
+            ],
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "client",
+          "version",
+          "platform",
+          "method",
+          "importRoutes"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "ClientCertificate": {
+        "description": "Traefik verifies presented certificate; Core ForwardAuth enforces presence on these HTTP routes and validates exact credential purpose/current state. Identity headers are internal, stripped at ingress, and not public client authentication parameters.",
+        "type": "mutualTLS"
+      },
+      "DownloadToken": {
+        "description": "Exactly 32 random bytes encoded as unpadded Base64URL (43 characters). Hash only in storage. Never log request query values. Mandatory for download redemption even if the caller also presents a certificate.",
+        "in": "query",
+        "name": "token",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "Proposed replacement for legacy TAK RMAPI package delivery. Direct Traefik path routing; no Core product proxy. mTLS plus Core ForwardAuth for protected routes; opaque short-lived token for public downloads. Package creation uses already-issued credentials. Core owns approval, credential purposes, UUID semantics, renewal and revocation. TAK-only issuance resources and private-key Secrets live outside the main user credential namespace. Final Core UI/session contract and TAK 5.8.69 callsign behavior remain separate integration gates. Greenfield implementation target: opendefence/integration-tak, Python package odintegration_tak. The pvarki/python-tak-operator initial_implementation branch is a reference prototype and tooling/CI source, not the repository to extend. TAK accepts the approved main certificate even when its key is client-held, alongside any approved TAK-only certificate for the same UUID. A package contains one exportable keypair. PKCS#12 Java compatibility is preserved. Credential-update variants are gated on exact client/version import validation.",
+    "title": "OpenDefence TAK Integration Package API",
+    "version": "1.0.0-draft.5"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/download-grants/{grantId}": {
+      "delete": {
+        "description": "Idempotent: absent records return 204 after principal authorization; an existing foreign record returns 404. A successful deletion prevents newly authorized redemptions, not recall of bytes already delivered. Enforce Origin/CSRF policy.",
+        "operationId": "deleteDownloadGrant",
+        "responses": {
+          "204": {
+            "description": "Revoked or already absent.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Always no-store for user-specific data and credential delivery.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "const": "no-referrer",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "summary": "Revoke an owned download grant",
+        "tags": [
+          "Grants"
+        ]
+      },
+      "get": {
+        "description": "Fresh authorization is required. Grant may be returned as expired before cleanup. Return 404 for an existing grant owned by someone else.",
+        "operationId": "getDownloadGrant",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadGrant"
+                }
+              }
+            },
+            "description": "Grant metadata; no URL/token.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Always no-store for user-specific data and credential delivery.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "const": "no-referrer",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "summary": "Read owned grant metadata without its token",
+        "tags": [
+          "Grants"
+        ]
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/GrantId"
+        }
+      ]
+    },
+    "/downloads/{grantId}/{fileName}": {
+      "get": {
+        "description": "No client certificate required. Treat token as a capability, never log it. Validate its hash and record expiry, then fresh User/credential/purpose/deadline/entitlement state and relevant package revision. Fail closed on authority outage. Reusable until expiry; never consume on GET or HEAD. A supplied invalid TLS certificate may fail the shared-host handshake before HTTP. The credential cannot switch under a grant; current callsign may change. Uniform 404 for malformed, unknown, expired, revoked or no-longer-authorized grants. Do not emit FastAPI-style 422 for invalid public capability inputs. Variant and baseline are taken only from the stored grant. Full packages may render the latest callsign; credential updates omit it. Recheck the authorizing credential as well as the delivered generation and rotation deadlines.",
+        "operationId": "redeemDownloadGrant",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Zip"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "DownloadToken": []
+          }
+        ],
+        "summary": "Download with the short-lived URL token",
+        "tags": [
+          "Downloads"
+        ]
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/GrantId"
+        },
+        {
+          "$ref": "#/components/parameters/FileName"
+        }
+      ]
+    },
+    "/package-profiles": {
+      "get": {
+        "operationId": "listPackageProfiles",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/PackageProfile"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Small fixed catalog. No pagination required.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque metadata revision; not a Kubernetes resourceVersion or a byte hash of the ZIP.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Catalog unchanged after authorization.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque metadata revision; not a Kubernetes resourceVersion or a byte hash of the ZIP.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "summary": "List supported package profiles",
+        "tags": [
+          "Packages"
+        ]
+      }
+    },
+    "/users/{userId}/client-packages/{profileId}": {
+      "get": {
+        "description": "Self service only. An admin role does not grant another user's private-key delivery. Readiness includes current authorization, exact credential material and current binding input revision. Does not start provisioning. The packaged credential differs from the set accepted by TAK. Readiness includes verified reconciliation of the complete desired acceptance set. Rotation status never treats a download as proof of installation.",
+        "operationId": "getClientPackage",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPackage"
+                }
+              }
+            },
+            "description": "Current package projection, including pending or degraded state.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Always no-store for user-specific data and credential delivery.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Opaque metadata revision; not a Kubernetes resourceVersion or a byte hash of the ZIP.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "const": "no-referrer",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Metadata unchanged after live authorization.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Always no-store for user-specific data and credential delivery.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Opaque metadata revision; not a Kubernetes resourceVersion or a byte hash of the ZIP.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "const": "no-referrer",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "summary": "Inspect current readiness and package metadata",
+        "tags": [
+          "Packages"
+        ]
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/UserId"
+        },
+        {
+          "$ref": "#/components/parameters/ProfileId"
+        }
+      ]
+    },
+    "/users/{userId}/client-packages/{profileId}/content": {
+      "get": {
+        "description": "Self-service delivery of one approved, exportable keypair. full renders the current callsign; credential-update preserves local callsign choices and uses only the exact validated import method. Missing update selectors or selectors on full return 422; an unknown/foreign/incompatible baseline, unverified method or unsupported client returns 409 update-not-supported. No key generation or activation side effects. Both the approved main certificate and any TAK-only certificate remain in the separate TAK acceptance set.",
+        "operationId": "downloadClientPackage",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Variant"
+          },
+          {
+            "$ref": "#/components/parameters/BaseRevision"
+          },
+          {
+            "$ref": "#/components/parameters/CompatibilityId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Zip"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotReady"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "summary": "Download the package over mTLS",
+        "tags": [
+          "Packages"
+        ]
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/UserId"
+        },
+        {
+          "$ref": "#/components/parameters/ProfileId"
+        }
+      ]
+    },
+    "/users/{userId}/client-packages/{profileId}/download-grants": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/UserId"
+        },
+        {
+          "$ref": "#/components/parameters/ProfileId"
+        }
+      ],
+      "post": {
+        "description": "Requires an approved mTLS principal and ready package. The server binds the grant to one exact credential generation and profile/config/trust revision, while using the latest callsign at redemption. Expiry is capped by 300 seconds, policy deadline and credential validity. Repeated POST may create another grant; active-grant limits bound this. Enforce browser Origin/CSRF policy. Bind full/update variant, base/target revisions and any compatibility ID. No old grant may silently fetch a successor. The high-OPSEC policy requires new-main or independently approved successor-delivery authorization; the old main certificate alone is insufficient.",
+        "operationId": "createDownloadGrant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "expiresInSeconds": 300
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CreateDownloadGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedDownloadGrant"
+                }
+              }
+            },
+            "description": "Created. The raw download URL is returned only now.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Always no-store for user-specific data and credential delivery.",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Management URI /integrations/tak/api/v1/download-grants/{grantId}; contains no token.",
+                "schema": {
+                  "format": "uri-reference",
+                  "type": "string"
+                }
+              },
+              "Referrer-Policy": {
+                "schema": {
+                  "const": "no-referrer",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotReady"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "summary": "Create a short-lived package download grant",
+        "tags": [
+          "Grants"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "ClientCertificate": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "Same-origin path on the configured HTTPS installation host.",
+      "url": "/integrations/tak/api/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Packages"
+    },
+    {
+      "name": "Grants"
+    },
+    {
+      "name": "Downloads"
+    }
+  ],
+  "x-authorization-freshness": "Live authorization for grants/content; no reliance solely on a stale informer or UserBinding Synced condition. Document bounded in-flight revocation race; no recall of downloaded keys.",
+  "x-callsign-policy": "Callsigns are mutable presentation, shared as desired state across credentials. Client editing stays enabled. Document ATAK disablePreferenceItem_locationCallsign as a future, device-tested UI restriction; do not emit it now. Credential-only updates omit callsign.",
+  "x-credential-namespaces": {
+    "apiAccess": "No cluster-wide Secret reads; explicit Core export for reused-main material",
+    "main": "Core-owned credential namespace",
+    "takOnly": "Dedicated TAK credential namespace or agreed operator namespace, separate from main"
+  },
+  "x-credential-use-observer": "For separately issued TAK-only keypairs only, reuse the guard GroupManager/getUserByConnectionId certificate read in a trusted worker. Core handles all main-certificate confirmation itself; ignore main-certificate TAK connections for rotation confirmation. Persist rotation-generation-bound observations in protected internal status, then let Core trigger idempotent issuer revocation. Do not expose a public confirmation endpoint. Retain this observation capability if upstream TAK removes the need for the optional asynchronous disconnect workaround.",
+  "x-design-status": "Proposal; not an implemented service. Scope is self-service package delivery. Core enrollment-token auth and delegated downloads require an explicit future Core policy contract, not implicit bearer access.",
+  "x-external-identity": "Normalize Core UUID ID encoding before comparing to the canonical urn:uuid:<uuid> URI SAN. The CN is display text and callsign is mutable Core metadata. Track issuer+serial/fingerprint per credential purpose.",
+  "x-implementation": {
+    "ciStatus": {
+      "publishingRunner": "arc-runner-set; confirmed available in OpenDefence",
+      "snyk": "Copy jobs but disable via explicit opt-in setting until new-organisation setup is complete; does not block bootstrap/publishing."
+    },
+    "processes": "Separate JVM-free API, serialized JNI operator and TAK-only credential observer as needed.",
+    "prototype": "https://github.com/pvarki/python-tak-operator/tree/b332e527c7dedf5e3f0a972b792c7d697dcace6b",
+    "pythonPackage": "odintegration_tak",
+    "repository": "https://github.com/opendefence/integration-tak",
+    "repositoryStatus": "planned; not created by this audit",
+    "sourceLayout": "src/odintegration_tak",
+    "tooling": "Copy and adapt uv, prek, strict Pyrefly, Ruff, pytest/coverage, Hatchling, versioning and CI from the prototype; rebind publishing and runner configuration."
+  },
+  "x-pkcs12-compatibility": "Preserve serialize_java_truststore trustedCertEntry behavior, CA filtering, aliases/deduplication and existing public-CA Java-compatible algorithms. Specify private-key export settings separately. Required keytool tests must verify CA trustedCertEntry and client PrivateKeyEntry/chain; skipped Java tests are not release validation.",
+  "x-revocation-enforcement": "Planned Traefik client-certificate OCSP middleware covers the protected HTTP routes where installed; verify request/handshake placement, verified peer identity on resumption, cache freshness and outage behavior. Raw CoT and existing sessions need separate TAK-side coverage. The inspected subscription-revocation-guard branch reports successful asynchronous disconnects on TAK 5.8-RELEASE-69 but early CoT was delivered. Prefer verified upstream enforcement; an isolated optional companion or no companion remains a deployment decision with explicit residual limits. Never embed this watcher in package API workers or delete the shared UUID account to retire one credential.",
+  "x-rotation-policy": "Core owns fresh-key issuance and approved purpose cohorts. Proposed high-OPSEC main rotation also rotates TAK-only credentials. Main-certificate rotation is confirmed and revoked by Core when it sees the new main certificate in use, including when that keypair is reused in a TAK ZIP. Separately issued TAK-only keypair rotation revokes its mapped predecessor after the observer reports first established authenticated TAK use of the exact successor fingerprint. Each flow proceeds independently; a main-certificate observation in TAK is not the confirmation path for either flow. Persist evidence with the rotation generation and reject stale observations; no manual confirmation or timer-driven pre-confirmation revocation. Distinct main and TAK-only replacements need their own evidence. Expiry, authorization loss and emergency compromise revocation remain independent. Persist the decision, revoke at the issuer, invalidate grants and verify OCSP/TAK enforcement separately. No successor delivery via stale grants or resurrected revoked keys on rollback.",
+  "x-tak-credential-acceptance": "Accept approved main plus TAK-only fingerprints under one immutable UUID regardless of main-key exportability. Exact 5.8.69 authentication enforcement must be proved: the inspected public server has scalar fingerprint storage and a username/CN fallback. Do not claim repeated registration creates a fingerprint allowlist.",
+  "x-tls-policy": "One host/entrypoint must have compatible TLS options. VerifyClientCertIfGiven plus route-level verified-certificate requirements allows both mTLS API operations and certificate-free capability downloads."
+}

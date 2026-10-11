@@ -1,0 +1,39 @@
+I1 TAK 5.8.84 authentication lifecycle inspection
+Date: 2026-10-10
+Evidence type: static bytecode inspection, not a live connection test.
+
+takserver.war SHA-256: 64309513e45ba1e92084d457cd787b35d1c570ab918a11fd1ce1e5bdd4d6f26c
+Inspection image: eclipse-temurin:17-jdk-noble@sha256:fb79620c3f6ee8f1c7530a8dc4fd49e3b410bcef037694ad4858a1553bac4170
+Tool: Java 17 javap -p -c, in Podman with --network none and read-only artifact mounts.
+Classpath: extracted WAR WEB-INF/classes:WEB-INF/lib/*.
+
+Observed bytecode:
+1. com.bbn.marti.nio.netty.handlers.NioNettyTlsServerHandler$2.operationComplete
+   Offset 1 checks the TLS future's isSuccess(). Offset 6 branches on failure.
+   Offset 72 calls createConnectionInfo(). Offset 116 calls createAuthenticationCodecs().
+   Offset 158 calls createSubscription(). This callback has no explicit AuthStatus comparison.
+2. com.bbn.marti.nio.netty.handlers.NioNettyTlsServerHandler.createConnectionInfo
+   Offsets 105 and 108 obtain the peer leaf and store it in ConnectionInfo.
+3. com.bbn.marti.nio.codec.impls.AbstractAuthCodec constructor
+   Offsets 34 through 40 initialize authStatus to NEW.
+4. com.bbn.marti.nio.codec.impls.X509AuthCodec.onConnect
+   Offset 31 calls doTlsAuth() before the base onConnect() call at offset 35.
+5. com.bbn.marti.nio.codec.impls.X509AuthCodec.doTlsAuth
+   Offset 160 extracts the certificate username.
+   Offset 266 calls X509Authenticator.authenticate(user, input).
+   Offset 289 stores the returned status in the codec's authStatus reference.
+6. com.bbn.marti.remote.groups.ConnectionInfo
+   The class stores the certificate and connection ID. It has no authentication-status field.
+   The handler field is transient. A serialized connection record does not carry the codec.
+
+Interpretation:
+- TLS peer-certificate metadata exists before the TAK authentication call completes.
+- The inspected X509 path can authenticate during onConnect without a CoT application message.
+- ConnectionInfo alone does not expose the completed TAK authentication result.
+- A successor observer needs positive authentication evidence bound to the exact connection and leaf.
+- Do not treat TLS success, object presence, or subscription presence alone as sufficient activation proof.
+
+Limits:
+- This trace does not prove remote observer access, rejection cleanup, or absence of another suitable API.
+- Live TLS, short-lived connections, reconnect, restart, resumption, and durable Core reporting remain untested.
+- No server binary, configuration, or shared environment was changed.
