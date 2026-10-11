@@ -1,15 +1,91 @@
 version: "3"
 
+vars:
+  TAK_CLUSTER_NAME: opendefence-dev
+  TAK_KUBE_CONTEXT: kind-opendefence-dev
+  BASE_PACKAGE: '{{.BASE_PACKAGE | default "oci://ghcr.io/opendefence/base:0.4.2-261010"}}'
+  TAK_IMAGE: localhost/tak-server:local
+  API_IMAGE: '{{.API_IMAGE | default "localhost/opendefence-integration-tak-api:i2-http-operator"}}'
+  OPERATOR_IMAGE: '{{.OPERATOR_IMAGE | default "localhost/opendefence-integration-tak-operator:i2-jni"}}'
+  TAK_SERVER_ADDRESS: tak.localtest.me
+  PUBLIC_ORIGIN: '{{.PUBLIC_ORIGIN | default "https://local-dev.opendefence.fi"}}'
+
 includes:
   registries: https://github.com/opendefence/base.git//taskfiles/registries.yaml?ref=main
   cluster: https://github.com/opendefence/base.git//taskfiles/cluster.yaml?ref=main
 
 tasks:
   up:
-    desc: Start the registries and local development cluster
+    desc: Start the local cluster and deploy the integration with TAK Server
     cmds:
       - task: registries:up
       - task: cluster:create
       - task: registries:connect
-      - task: cluster:configure-mirrors
+      # The IDE exports NODE as a binary path; the base task uses NODE as a Kind node name.
+      - env -u NODE task --yes cluster:configure-mirrors
       - task: cluster:document-local-registry
+      - task: platform
+      - task: credentials
+      - task: database
+      - task: identities
+      - task: images
+      - task: tak
+      - task: smoke
+
+  platform:
+    desc: Install the base operators and local CA
+    status:
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n cnpg-system get deployment cnpg-controller-manager >/dev/null 2>&1
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} get clusterissuer public-issuer >/dev/null 2>&1
+    cmds:
+      - test "$(kubectl config current-context)" = {{.TAK_KUBE_CONTEXT | shellQuote}}
+      - zarf --architecture amd64 package deploy {{.BASE_PACKAGE | shellQuote}} --connected --confirm --set-values issuer.type=ca
+
+  credentials:
+    desc: Generate local TAK passwords
+    cmds:
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} apply -f k8s/integration/namespace.yaml
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak apply -f ../tak-server/k8s/local/passwords.yaml
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak wait --for=condition=Ready externalsecret/tak-database-runtime externalsecret/tak-store-passwords --timeout=180s
+
+  database:
+    desc: Start the local TAK database
+    cmds:
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak apply -f ../tak-server/k8s/local/database.yaml
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak wait --for=condition=Ready cluster/tak-database --timeout=600s
+
+  identities:
+    desc: Issue local TAK identities and truststores
+    cmds:
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak apply -f ../tak-server/k8s/local/certificates.yaml
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak wait --for=condition=Ready certificate/tak-cot-identity certificate/tak-https-identity certificate/tak-client-trust certificate/tak-federation-bootstrap certificate/tak-probe-identity --timeout=300s
+
+  images:
+    desc: Build and load the TAK, API, and operator images into Kind
+    cmds:
+      - |
+        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && ! docker version 2>&1 | grep -qi podman; then
+          runtime=docker
+        elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
+          runtime=podman
+        else
+          echo 'Start Docker or Podman before building images' >&2
+          exit 1
+        fi
+        "$runtime" build -t {{.TAK_IMAGE | shellQuote}} ../tak-server
+        "$runtime" build --target api -t {{.API_IMAGE | shellQuote}} .
+        "$runtime" build --target operator --build-arg TAKSERVER_IMAGE={{.TAK_IMAGE | shellQuote}} -t {{.OPERATOR_IMAGE | shellQuote}} .
+      - kind load docker-image --name {{.TAK_CLUSTER_NAME | shellQuote}} {{.TAK_IMAGE | shellQuote}} {{.API_IMAGE | shellQuote}} {{.OPERATOR_IMAGE | shellQuote}}
+
+  tak:
+    desc: Deploy the local integration and TAK Server Zarf package
+    cmds:
+      - test "$(kubectl config current-context)" = {{.TAK_KUBE_CONTEXT | shellQuote}}
+      - zarf dev deploy . --connected --flavor local-dev --components integration-local-dev,tak-schema,tak-grants,tak-server --create-set {{printf "TAK_IMAGE=%s" .TAK_IMAGE | shellQuote}} --deploy-set-variables {{printf "PUBLIC_ORIGIN=%s" .PUBLIC_ORIGIN | shellQuote}} --deploy-set-variables {{printf "API_IMAGE=%s" .API_IMAGE | shellQuote}} --deploy-set-variables {{printf "OPERATOR_IMAGE=%s" .OPERATOR_IMAGE | shellQuote}} --deploy-set-variables {{printf "TAK_SERVER_ADDRESS=%s" .TAK_SERVER_ADDRESS | shellQuote}}
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak rollout restart statefulset/tak-server
+
+  smoke:
+    desc: Check TAK readiness and authenticated HTTPS
+    cmds:
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak rollout status statefulset/tak-server --timeout=300s
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak exec tak-server-0 -c api -- curl --silent --show-error --fail --cacert /probe/ca.crt --cert /probe/tls.crt --key /probe/tls.key --output /dev/null --write-out '%{http_code}\n' https://{{.TAK_SERVER_ADDRESS}}:8443/Marti/api/user-management/api/list-users

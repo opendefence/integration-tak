@@ -13,9 +13,13 @@ See [package construction](docs/packages.md) and [PKCS#12 export](docs/certifica
 
 ## Development
 
-Run `task up` with Task 3.53 or newer to start the local kind cluster and registries
-using the remote Taskfiles from `opendefence/base`. Task will ask you to
-trust the remote source on first use.
+Check out `tak-server` beside this repository.
+Install Kind, Zarf, kubectl, and Docker or Podman.
+Run `task --yes up` with Task 3.53 or newer to start the local Kind cluster and registries.
+The task installs the base operators, local TAK database and identities.
+It builds and loads the three images, deploys this repository's Zarf package, and checks authenticated TAK HTTPS.
+The task uses the remote Taskfiles from `opendefence/base`.
+Task asks you to trust the remote source on first use if you omit `--yes`.
 
 Use Python 3.14 and uv.
 Run `uv sync --locked` to install the development environment without JNI.
@@ -37,25 +41,30 @@ Credential-update delivery remains disabled until client tests establish a suppo
 
 ## Kubernetes package
 
-Run `zarf dev lint . --flavor local-dev` to check the local package.
-Install the `platform.opendefence.fi/v1alpha1` Core CRDs before you start the operator.
-Build the API and operator images with the commands below.
-Load both integration images into Kind before deployment.
-Run this command to deploy the local package:
+Run `zarf dev lint . --flavor local-dev --set TAK_IMAGE=localhost/tak-server:local` to check the local package.
+Install the `platform.opendefence.fi/v1alpha1` Core CRDs before you test operator reconciliation.
+The local task builds and loads the images into Kind.
+Run this command to redeploy the local package after its prerequisites are ready:
 
 ```sh
-zarf dev deploy --connected --flavor local-dev --components integration-local-dev \
+zarf dev deploy --connected --flavor local-dev --components integration-local-dev,tak-schema,tak-grants,tak-server \
+  --create-set TAK_IMAGE=localhost/tak-server:local \
   --deploy-set-variables PUBLIC_ORIGIN=https://local-dev.opendefence.fi \
   --deploy-set-variables API_IMAGE=localhost/opendefence-integration-tak-api:i2-http-operator \
-  --deploy-set-variables OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-jni
+  --deploy-set-variables OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-jni \
+  --deploy-set-variables TAK_SERVER_ADDRESS=tak.localtest.me
 ```
 
-Run `zarf package create . --flavor local-dev` to build an archive.
+The package deploys the schema Job, grants Job, and TAK Server after the integration workloads.
+It builds the TAK resources from the sibling `tak-server` checkout.
+Run `zarf package create . --flavor local-dev --set TAK_IMAGE=localhost/tak-server:local` to build a local archive.
 Use `--set-variables` with the same values when you deploy that archive.
 
-The `production` flavor also packages manifests only.
-Set `PUBLIC_ORIGIN`, `API_IMAGE`, and `OPERATOR_IMAGE` before deployment.
-The cluster must be able to pull these images from its registry.
+The `production` flavor also includes the TAK Server image and resources.
+Set `PUBLIC_ORIGIN`, `API_IMAGE`, `OPERATOR_IMAGE`, and `TAK_SERVER_ADDRESS` before deployment.
+Set `TAK_IMAGE` to a published image digest when you create a production package.
+Provide the TAK database, passwords, and identities in `integration-tak` before deployment.
+The cluster must be able to pull the API and operator images from its registry.
 Do not use this package for production authentication until the Core adapters and strict TAK server checks pass.
 
 ## Source foundation
