@@ -4,7 +4,7 @@ metadata:
   name: integration-tak
 spec:
   displayName: TAK
-  version: "0.1.0"
+  version: "0.1.0+261011"
   productInfo:
     descriptions:
       - language: en

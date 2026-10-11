@@ -1,7 +1,7 @@
 kind: ZarfPackageConfig
 metadata:
   name: integration-tak
-  version: "0.1.0"
+  version: "0.1.0+261011"
   description: OpenDefence TAK integration API, operator, and server
 constants:
   - name: TAK_IMAGE
