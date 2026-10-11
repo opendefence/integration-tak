@@ -3,9 +3,13 @@
 import importlib
 import os
 from pathlib import Path
+import re
 import tempfile
 from threading import RLock
 from typing import Any, ClassVar
+from uuid import UUID
+
+from opendefence_integration_tak.certificates import PublicCredential
 
 # Only creates trusted configuration XML.
 import xml.etree.ElementTree as ET  # nosec B405
@@ -67,6 +71,7 @@ class TakJvmRuntime:
         self._manager: Any = None
         self._ssl: Any = None
         self._role: Any = None
+        self._user: Any = None
         self._closed = False
 
     def _configuration(self) -> Path:
@@ -144,6 +149,7 @@ class TakJvmRuntime:
             self._manager = self._helper.getUserManager(self._profile)
             self._ssl = load("com.bbn.marti.takcl.SSLHelper")
             self._role = load("com.bbn.marti.xml.bindings.Role")
+            self._user = load("com.bbn.marti.xml.bindings.UserAuthenticationFile$User")
 
     def check(self) -> None:
         with self._lock:
@@ -187,6 +193,86 @@ class TakJvmRuntime:
         except Exception:
             raise RuntimeError("TAK integration administrator registration is unverified") from None
         raise RuntimeError("TAK integration administrator registration is unverified") from None
+
+    def reconcile_user(
+        self, user_uid: str, credentials: tuple[PublicCredential, ...], role: str | None, groups: tuple[str, ...]
+    ) -> None:
+        """Project User permissions to each certificate identity through JNI.
+
+        The reserved identifier includes the User UID and exact leaf fingerprint.
+        Scan native records to recover partial writes after a tak-operator restart.
+        Callsigns and certificate CNs do not select records for updates or removal.
+        """
+        prefix = f"od-user-{UUID(user_uid)}-"
+        if role not in {None, "ROLE_ADMIN", "ROLE_READONLY"}:
+            raise ValueError("Unsupported projected TAK role")
+        desired = {}
+        for credential in credentials:
+            fingerprint = credential.fingerprint_sha256
+            if re.fullmatch(r"[0-9a-f]{64}", fingerprint) is None:
+                raise ValueError("Invalid certificate fingerprint")
+            if role is not None:
+                desired[prefix + fingerprint] = ":".join(fingerprint[i : i + 2] for i in range(0, 64, 2)).upper()
+        with self._lock:
+            self.check()
+            managed = {
+                str(user.getIdentifier()): user
+                for user in self._manager.getAllUsers().toArray()
+                if str(user.getIdentifier()).startswith(prefix)
+                and re.fullmatch(r"[0-9a-f]{64}", str(user.getIdentifier())[len(prefix) :]) is not None
+            }
+            for identifier, current in managed.items():
+                self._check_certificate_record(identifier, current)
+            for identifier in sorted(managed.keys() - desired.keys()):
+                try:
+                    self._manager.removeUser(identifier)
+                except Exception:
+                    if self._manager.getFirstUser(identifier) is not None:
+                        raise RuntimeError("TAK certificate removal is unverified") from None
+                if self._manager.getFirstUser(identifier) is not None:
+                    raise RuntimeError("TAK certificate removal is unverified")
+            for identifier, fingerprint in sorted(desired.items()):
+                self._project_certificate(identifier, fingerprint, role, frozenset(groups))
+
+    @staticmethod
+    def _check_certificate_record(identifier: str, current: Any) -> None:
+        if current is not None and (
+            str(current.getFingerprint()).replace(":", "").lower() != identifier[-64:]
+            or current.getPassword() is not None
+        ):
+            raise ValueError("TAK certificate record ownership conflict")
+
+    @staticmethod
+    def _matches(current: Any, fingerprint: str, role: str | None, groups: frozenset[str]) -> bool:
+        return (
+            current is not None
+            and current.getFingerprint() == fingerprint
+            and current.getRole() is not None
+            and str(current.getRole().value()) == role
+            and frozenset(current.getGroupList().toArray()) == groups
+            and not current.getGroupListIN().toArray()
+            and not current.getGroupListOUT().toArray()
+            and current.getPassword() is None
+        )
+
+    def _project_certificate(self, identifier: str, fingerprint: str, role: str | None, groups: frozenset[str]) -> None:
+        current = self._manager.getFirstUser(identifier)
+        self._check_certificate_record(identifier, current)
+        if self._matches(current, fingerprint, role, groups):
+            return
+        replacement = self._user()
+        replacement.setIdentifier(identifier)
+        replacement.setFingerprint(fingerprint)
+        replacement.setRole(self._role.fromValue(role))
+        for group in sorted(groups):
+            replacement.getGroupList().add(group)
+        try:
+            self._manager.addOrUpdateUser(replacement, True, current)
+        except Exception:
+            if not self._matches(self._manager.getFirstUser(identifier), fingerprint, role, groups):
+                raise RuntimeError("TAK certificate projection is unverified") from None
+        if not self._matches(self._manager.getFirstUser(identifier), fingerprint, role, groups):
+            raise RuntimeError("TAK certificate projection is unverified")
 
     def close(self) -> None:
         with self._lock:

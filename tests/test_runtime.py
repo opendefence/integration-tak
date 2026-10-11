@@ -12,6 +12,7 @@ from starlette.applications import Starlette
 
 from opendefence_integration_tak import console, operator, runtime
 from opendefence_integration_tak.api import PREFIX
+from opendefence_integration_tak.certificates import PublicCredential
 from lib_opendefence_core.models.v1alpha1 import UserBinding
 from tests.kubernetes import KubernetesFixture
 from tests.test_operator import core_user, condition
@@ -78,16 +79,24 @@ def test_operator_runtime_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, 
         def check(self) -> None:
             jni_calls.append("check")
 
+        def reconcile_user(
+            self, user_uid: str, credentials: tuple[PublicCredential, ...], role: str | None, groups: tuple[str, ...]
+        ) -> None:
+            assert user_uid == "original-user"
+            assert len(credentials) == 1 and credentials[0].fingerprint_sha256 == "a" * 64
+            assert role == "ROLE_READONLY" and groups == ()
+            jni_calls.append("project")
+
         def close(self) -> None:
             jni_calls.append("close")
 
     monkeypatch.setattr(operator, "TakJvmRuntime", TakFixture)
     with pytest.raises(KeyboardInterrupt):
         operator.run_operator("tak")
-    assert jni_calls == ["start", "check", "close"]
+    assert jni_calls == (["start", "check", "close"] if failure else ["start", "check", "project", "close"])
     if not failure:
         binding = next(item for item in fixture.objects.values() if isinstance(item, UserBinding))
-        assert condition(binding).reason == "AuthorityUnavailable"
+        assert condition(binding).reason == "EnforcementUnverified"
     assert "jnius" not in sys.modules
 
 

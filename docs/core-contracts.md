@@ -39,10 +39,10 @@ The tak-operator uses the projected roles and does not calculate roles from `spe
 It treats `user` as implied for each approved User.
 It maps `superadmin` to TAK `ROLE_ADMIN`.
 It maps other approved Users to TAK `ROLE_READONLY`.
-One User identity owns one TAK account and one UserBinding.
-Several accepted certificates can connect to that account during rollover.
-The tak-operator requests the account role and groups from `User.status.roles` and `User.status.groups`.
-The accepted certificate set identifies connections to that account.
+One User identity owns one UserBinding and a TAK record for each accepted certificate.
+Each record receives the role and groups from `User.status.roles` and `User.status.groups`.
+Several certificate identities can use the same callsign during rollover.
+The tak-operator selects records by User UID and exact certificate fingerprint.
 Each certificate is identified by fingerprint and issuer plus serial.
 Certificates do not grant a role or group membership.
 The core-operator refuses deletion after `spec.approvedAt` is set.
@@ -51,13 +51,15 @@ Keep the revoked User as a permanent revocation record.
 The tak-operator requests removal of all accepted credentials for that User.
 It also removes the User's TAK role and groups.
 It keeps the UserBinding while the revoked User remains.
-A native projector must remove only a certificate that leaves the accepted set.
-It must keep the account, its role, and the other accepted certificates.
+A native projector removes only the TAK record for a certificate that leaves the accepted set.
+It keeps the other certificate records and their projected permissions.
 It must not grant a role by callsign or certificate CN.
 It requires `status.observedGeneration` to match the User generation before it requests a TAK role.
 Tests can patch the User status through the CRD without a running core-operator.
 The tak-operator does not mark a UserBinding ready until TAK confirms the complete credential and permission projection.
-The current `UnavailableProjector` makes no native role grants and leaves bindings unready.
+The `JniProjector` applies the native records through the tak-operator's JNI bridge.
+It verifies roles, fingerprints, and all three native group lists after writes.
+It leaves bindings unready with `EnforcementUnverified` until strict admission is verified.
 The supplied RBAC belongs to the Core service account. It does not grant the TAK integration access.
 The integration still needs its own resource and namespaced binding/status permissions.
 

@@ -2,6 +2,7 @@
 
 This repository contains the `opendefence_integration_tak` project.
 The project contains a client package builder, seven delivery API routes, Secret-backed grants and a UserBinding operator.
+The tak-operator uses JNI to apply User roles and groups to each accepted certificate identity in TAK Server.
 Production Core authorization and strict TAK projection adapters remain unavailable.
 See [API and operator](docs/api-operator.md) for entry points, behavior and exact remaining boundaries.
 The OpenDefence stack Kustomization at `k8s/stack` composes these workloads with

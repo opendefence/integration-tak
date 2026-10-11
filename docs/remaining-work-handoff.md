@@ -128,7 +128,7 @@ Do not combine results from these versions into one accepted runtime tuple.
 Complete these checks against the agreed binary and deployment:
 
 - Implement the adopted strict approved-fingerprint mechanism.
-- Prove through live TLS that approved main and TAK-only certificates authenticate to the same UUID account with the desired permissions.
+- Prove through live TLS that each accepted certificate identity receives the User's projected permissions.
 - Prove that a third CA-valid certificate with the same UUID, outside the approved set, is rejected before access is granted.
 - Verify roles and groups after writes, uncertain writes, restart, and reconciliation.
 - Extend the component callsign evidence to network CoT, reconnect, restart, live subscription, and peer display.
@@ -207,7 +207,8 @@ Main and TAK-only activation flows are independent.
 Qualifying authenticated successor use triggers Core's revocation of its mapped predecessor automatically.
 A download, manual acknowledgement, or required CoT/HTTPS transaction is not activation.
 Planned overlap has no default forced-cutover timer.
-Never delete the shared UUID account to revoke one certificate.
+Remove only the native record for the revoked certificate.
+Keep the other certificate identities for that User.
 
 ## Later validation and delivery
 

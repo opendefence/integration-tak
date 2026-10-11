@@ -146,7 +146,7 @@ They do not define Core HTTP paths, identity headers, credential resources, or s
 See [Core contracts](core-contracts.md) and [server changes](tak-server-change-handoff.md).
 The package exporter now checks the User UUID in the leaf URI SAN.
 Delivery compares Core's selected public credential record with the certificate used for export.
-The operator reads the provisional accepted-credential User annotation and includes it in its input revision.
+The tak-operator reads the provisional accepted-credential User annotation and includes it in its input revision.
 It passes only current, valid public records to a projector. Missing or malformed metadata leaves the UserBinding unready.
 It passes an empty set when metadata is invalid or the User is unapproved or revoked, so a strict projector can remove old access.
 It passes the last verified applied records to the projector, including expired records.
@@ -154,7 +154,20 @@ It writes the new applied set only after a verified projection receipt.
 It logs a malformed applied record and asks the projector to recover from TAK state.
 It replaces the record only after verified readback.
 It rejects a projection receipt that stays valid beyond the earliest accepted certificate expiry.
-The current TAK server still needs a compatible account mapping and strict fingerprint enforcement.
+The `JniProjector` creates one native record for each accepted certificate.
+Its identifier is `od-user-<User UID>-<leaf SHA-256>`.
+The tak-operator reserves this identifier prefix for its records.
+It converts the fingerprint to TAK's uppercase, colon-separated SHA-256 format.
+It applies the User's TAK role and projected group names to every current record.
+It replaces all group lists, including directional groups, with the projected state.
+It removes records for credentials outside the accepted set.
+It clears native records for unapproved, revoked, or stale User state.
+It scans the reserved records after a restart to recover partial writes.
+It rejects records with an unexpected fingerprint or a password.
+Callsign changes do not change these identifiers or certificate records.
+The current native file-auth model still permits identifier fallback during authentication.
+Native readback therefore leaves `Synced=False` with `EnforcementUnverified`.
+Strict admission and readback from both TAK JVMs remain separate verification work.
 
 Implement these inputs when their versioned contracts are available:
 

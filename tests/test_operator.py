@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from datetime import tzinfo
 import json
+from unittest.mock import MagicMock
 
 from cloudcoil.apimachinery import ObjectMeta, Time
 from cloudcoil.errors import APIError
@@ -15,6 +16,8 @@ from opendefence_integration_tak.certificates import ACCEPTED_CREDENTIALS_ANNOTA
 
 from opendefence_integration_tak.operator import (
     BindingReconciler,
+    JniProjector,
+    Projector,
     ProjectionReceipt,
     ProjectionUnavailable,
     UnavailableProjector,
@@ -96,7 +99,7 @@ class FixtureProjector:
         )
 
 
-def reconciler(projector: FixtureProjector | UnavailableProjector) -> tuple[BindingReconciler, KubernetesFixture, User]:
+def reconciler(projector: Projector) -> tuple[BindingReconciler, KubernetesFixture, User]:
     fixture = KubernetesFixture()
     user = core_user()
     fixture.put(user, "users")
@@ -127,6 +130,27 @@ def test_unavailable_authority_and_idempotency() -> None:
     writes = len(fixture.writes)
     worker.reconcile(user)
     assert len(fixture.writes) == writes
+
+
+def test_jni_projector_uses_user_permissions_and_retries_native_failures() -> None:
+    runtime = MagicMock()
+    worker, fixture, user = reconciler(JniProjector(runtime))
+    assert user.status is not None
+    user.status.roles = [ResolvedRef(name="superadmin", uid="role-uid")]
+    user.status.groups = [ResolvedRef(name="team", uid="group-uid")]
+    fixture.put(user, "users")
+    assert condition(worker.reconcile(user)).reason == "EnforcementUnverified"
+    initial = runtime.reconcile_user.call_args
+    assert initial.args[0] == "original-user"
+    assert initial.args[2:] == ("ROLE_ADMIN", ("team",))
+    user.spec.callsign = "second"
+    fixture.put(user, "users")
+    worker.reconcile(user)
+    assert runtime.reconcile_user.call_args == initial
+    runtime.reconcile_user.side_effect = Exception("Java transport failed")
+    worker.run_once()
+    binding = worker.bindings.get(binding_name(user), "tak")
+    assert condition(binding).reason == "ProjectionFailed"
 
 
 def test_projected_roles_drive_tak_roles_without_core_operator() -> None:
@@ -166,7 +190,8 @@ def test_projected_roles_drive_tak_roles_without_core_operator() -> None:
     with pytest.raises(ProjectionUnavailable):
         projected_tak_role(user, now)
     assert condition(worker.reconcile(user)).status == "False"
-    assert projector.seen_roles[-1] == "ROLE_READONLY"
+    assert projector.seen_roles[-1] is None
+    assert projector.seen_credentials[-1] == ()
 
     user.spec.revoked_at = now
     assert projected_tak_role(user, now) is None

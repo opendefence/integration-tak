@@ -5,7 +5,7 @@
 I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe proves an approved-set failure.
 The current sibling candidate is TAK 5.8.92. Its strict admission agent checks test traffic.
-The server has no trusted projection writer or verified readback from both TAK JVMs.
+The strict admission agent has no update interface or verified readback across both TAK JVMs.
 I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
 The tak-operator now starts one TAKCL JVM and checks the remote user manager on each scan.
 It can register a dedicated `integration-tak-admin` certificate through JNI and verify the stored fingerprint and role.
@@ -22,7 +22,11 @@ Certificates do not grant roles or group membership.
 Removal from the accepted set requests removal of that certificate's access.
 The Kind cluster has simulated User CRDs and no core-operator deployment.
 The simulated superadmin maps to `ROLE_ADMIN`; the basic User maps to `ROLE_READONLY`.
-The production tak-operator still uses `UnavailableProjector` and makes no native human role grants.
+The tak-operator now uses `JniProjector` to apply a separate native record for each accepted certificate.
+It applies the User's role and group names to each record through JNI.
+It removes an old certificate record without changing the remaining records.
+Native readback verifies every write, including uncertain writes.
+Strict admission remains unverified, so bindings report `EnforcementUnverified`.
 The stack Kustomization composes the sibling TAK Server integrated overlay with the
 integration workloads. Separate entry points render the schema and grants Jobs.
 `kubectl kustomize` rendered the stack and both namespaced Jobs using the sibling checkout.
@@ -311,17 +315,56 @@ The selected User annotation key, IntegrationManifest schema, and integration SA
 The current local administrator bootstrap does not use an IntegrationManifest.
 The operator provisionally reads `platform.opendefence.fi/accepted-credentials` as a version 1 JSON set.
 It includes that annotation in the input revision and passes current public records to the projector.
-Missing or malformed metadata keeps UserBinding readiness false. The production projector remains unavailable.
+Missing or malformed metadata keeps UserBinding readiness false.
+The later JNI projection slice below supersedes the unavailable native projector.
 The operator passes an empty set when metadata is invalid or the User is unapproved or revoked.
 It keeps the last verified public credential set in `integration.opendefence.fi/applied-credentials` on the UserBinding.
 The projector receives that prior set after a restart. A malformed record requires TAK readback before it is replaced.
-No live TAK deprovisioning is claimed.
+This earlier checkpoint did not test live TAK deprovisioning.
 The latest local suite passed 288 tests, skipped 2 tests, and reached 94.54% coverage.
 Ruff, Pyrefly, Bandit, and the staged hooks passed.
 
+## JNI certificate projection
+
+The tak-operator owns native User projection through JNI.
+The user confirmed that several TAK certificate identities can use the same callsign.
+The tak-operator now creates `od-user-<User UID>-<leaf SHA-256>` records.
+It sets each record's fingerprint, role, and complete group list through `FileUserManagementInterface`.
+It derives roles and groups only from the User CR status.
+It removes a record when its certificate leaves the accepted set.
+It reads native state after writes and after uncertain responses.
+It scans its reserved identifiers to recover partial writes after a restart.
+
+The live test used TAK 5.8.92 in `kind-opendefence-dev`, namespace `integration-tak`.
+The final tak-operator image ID was `6c5f3245bfefbd865a26e6392f8f74205b4780a3ee8bcb55f46127db4bff4d1e`.
+The cluster had simulated User projections and no core-operator.
+Two accepted superadmin certificates had the same display CN and distinct fingerprints.
+A third certificate had the same CN and was outside the accepted set.
+The basic User had one accepted certificate and no explicit projected roles.
+Both Users had the projected group `tak-sim-team`.
+
+| User state | Certificate A | Certificate B | Unaccepted certificate | Basic User |
+| --- | --- | --- | --- | --- |
+| Projected `superadmin` | HTTP 200 | HTTP 200 | HTTP 403 | HTTP 403 |
+| Roles and groups removed | HTTP 403 | HTTP 403 | HTTP 403 | HTTP 403 |
+| `superadmin` restored; certificate A removed | HTTP 403 | HTTP 200 | HTTP 403 | HTTP 403 |
+
+Requests used mTLS on 8443 at `/Marti/api/user-management/api/list-users`.
+Server certificate chain and hostname validation were enabled.
+Native readback confirmed role changes, group removal, and removal of only certificate A.
+A tak-operator restart retained the final native records and HTTP results.
+The final User projection retains certificate B for the superadmin and the basic User's certificate.
+The simulated User CRs and their UserBindings remain in the cluster.
+
+The local suite passed 294 tests and skipped 2 tests, with 94.11% coverage.
+These checks prove native reconciliation and the tested HTTP role decisions.
+They do not prove strict messaging admission, cached-session revocation, or an authority expiry bound.
+Bindings remain `Synced=False` with `EnforcementUnverified`.
+
 ## Next action
 
-Implement the production `Authority` and `Projector` adapters when versioned Core semantics and strict server capabilities are available.
+Implement the production `Authority` adapter when versioned Core semantics are available.
+Extend `JniProjector` with verified credential admission and readback from both TAK JVMs.
 The seven routes, typed Core readers, binding lifecycle, bounded Secret store and separate CLI workloads are implemented.
 Their fixture-backed tests do not establish production authorization or server enforcement.
 Keep the API JVM-free and the JNI bridge inside the operator process.

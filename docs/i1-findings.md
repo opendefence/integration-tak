@@ -3,6 +3,9 @@
 ## Status and scope
 
 I1 is incomplete.
+The historical probe below used one native account for all certificates of a User.
+The later JNI projection uses separate native certificate records with shared User permissions.
+See [JNI certificate projection](implementation-status.md#jni-certificate-projection) for the live 5.8.92 checks.
 The user confirmed `gpt-6-astra` / `xhigh` with "Switched; resume I1".
 The host cannot verify the active model metadata.
 The user resumed binary probing and confirmed the I1 gate on 2026-10-10.

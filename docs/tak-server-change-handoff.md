@@ -137,7 +137,11 @@ Complete these coupled changes:
 9. Version the schema, management capability, implementation, and artifact tuple together. Expose enough capability information for integration to reject an incompatible server.
 
 Do not encode a list in the legacy scalar fingerprint field or alternate registrations as a substitute.
-Do not delete the shared UUID account to revoke one certificate.
+The tak-operator uses one native TAK record for each accepted certificate.
+Several records can have the same callsign and receive one User's projected permissions.
+Remove only the native record for a revoked certificate.
+Preserve the other certificate identities for that User.
+The strict policy must not require one native account per User UUID.
 The current policy limits are 1,024 accounts, 32 fingerprints per account, and 256 account characters.
 Validate those limits against the intended deployment and expose limit failures clearly.
 Exact account strings do not settle Core's UUID encoding contract.

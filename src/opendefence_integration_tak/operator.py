@@ -78,20 +78,21 @@ class Projector(Protocol):
         user: User,
         projection: UserProjection,
         revision: str,
-    ) -> ProjectionReceipt:
+    ) -> ProjectionReceipt | None:
         """Apply the full approved set and permissions; read back uncertain writes.
 
         Previous credentials include expired records and are only a retry hint.
         Read TAK state because the binding may predate this annotation or a write may be partial.
         An empty credential set removes access.
         Implementations own one JVM in this process and return Python values only.
-        One User owns one TAK account; multiple accepted credentials can access it.
-        Derive the account role and groups only from the User projection.
+        One User owns one UserBinding and separate TAK certificate identities.
+        Derive each identity's role and groups only from the User projection.
         Bind credentials by exact fingerprint and issuer/serial pair.
         Remove only credentials absent from the accepted set before confirming readback.
-        Keep the account, role, and remaining credentials during rollover.
+        Keep the remaining certificate identities during rollover.
         A receipt requires verified messaging AND API enforcement. Never synthesize
         it from file-auth or scalar registerCert results.
+        Return None when native records are applied but enforcement is unverified.
         """
         ...
 
@@ -104,6 +105,25 @@ class UnavailableProjector:
         revision: str,
     ) -> ProjectionReceipt:
         raise ProjectionUnavailable
+
+
+class JniProjector:
+    def __init__(self, runtime: TakJvmRuntime) -> None:
+        self.runtime = runtime
+
+    def reconcile(self, user: User, projection: UserProjection, revision: str) -> None:
+        if user.metadata is None or not user.metadata.uid:
+            raise ValueError("Core User UID is missing")
+        try:
+            self.runtime.reconcile_user(
+                user.metadata.uid,
+                projection.credentials,
+                projection.tak_role,
+                tuple(group.name for group in projection.groups),
+            )
+        except Exception:
+            raise RuntimeError("TAK User projection failed") from None
+        # shortcut: JNI verifies native records; strict admission still needs both-JVM readback.
 
 
 def input_revision(user: User) -> str:
@@ -176,9 +196,7 @@ def _user_projection(
     try:
         role = projected_tak_role(user, now)
     except ProjectionUnavailable:
-        if credentials:
-            raise
-        role = None
+        return UserProjection(previous, (), None, ())
     groups = tuple(user.status.groups) if role is not None and user.status else ()
     return UserProjection(previous, credentials, role, groups)
 
@@ -329,10 +347,15 @@ class BindingReconciler:
         except Exception:
             self._status(binding, False, "ProjectionFailed")
             raise
-        if not receipt.current(revision, datetime.now(UTC)) or (
-            projection.credentials and receipt.valid_until > min(record.not_after for record in projection.credentials)
+        if (
+            receipt is None
+            or not receipt.current(revision, datetime.now(UTC))
+            or (
+                projection.credentials
+                and receipt.valid_until > min(record.not_after for record in projection.credentials)
+            )
         ):
-            return self._status(binding, False, "ProjectionUnverified")
+            return self._status(binding, False, "EnforcementUnverified" if receipt is None else "ProjectionUnverified")
         if not projection.credentials:
             return self._status(self._record_applied(binding, receipt, ()), False, "CredentialsUnavailable")
         if user.name is None:
@@ -358,6 +381,8 @@ class BindingReconciler:
                 _LOGGER.warning("Binding conflict; retry on next scan")
             except ValueError:
                 _LOGGER.error("Invalid Core identity or binding ownership; skipped this user")
+            except RuntimeError:
+                _LOGGER.error("TAK projection failed; retry this User on the next scan")
 
 
 def run_operator(namespace: str) -> None:
@@ -372,7 +397,7 @@ def run_operator(namespace: str) -> None:
             reconciler = BindingReconciler(
                 User.client(config),
                 UserBinding.client(config, namespace=namespace),
-                UnavailableProjector(),
+                JniProjector(tak),
             )
             while True:
                 try:
