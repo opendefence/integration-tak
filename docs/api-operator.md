@@ -169,6 +169,53 @@ The current native file-auth model still permits identifier fallback during auth
 Native readback therefore leaves `Synced=False` with `EnforcementUnverified`.
 Strict admission and readback from both TAK JVMs remain separate verification work.
 
+## CoT connection removal
+
+The tak-operator uses the JNI connection lookup and removal code from
+[python-tak-rmapi PR #155](https://github.com/pvarki/python-tak-rmapi/pull/155).
+The source commit is `ed6a8f14656a03d4599aa923d1c7a5901cb0dde7`.
+The port reads live subscriptions from each messaging node.
+It reads the TLS certificate through `GroupManager.getUserByConnectionId`.
+It selects connections by the exact SHA-256 fingerprint.
+It calls `deleteSubscription` on the originating node.
+Each service proxy has the legacy five-second RPC timeout.
+A failed connection or node does not prevent attempts on the remaining connections and nodes.
+The existing native registration calls still use the TAKCL user manager.
+The five-second service timeout does not bound those calls or the full scan.
+
+The tak-operator requests a session refresh after certificate, role, or group changes.
+It attempts the kick even if a native registration write fails.
+It retains failed kicks for retry when the native certificate record is already absent.
+Unchanged successor certificates keep their sessions when a predecessor is removed.
+After a tak-operator restart, each managed certificate gets one session refresh.
+This refresh recovers permission changes whose native write completed before a crash.
+An unchanged projection does not request another refresh in the same process.
+
+The regular ten-second scan also checks reconnects.
+It removes expired certificates and certificates without an exact native fingerprint registration.
+An identity that TAK has not yet supplied is checked again on a later scan.
+The scan runs after a Core scan failure as well.
+Core owns credential revocation. This port has no separate issuer denylist.
+A retained native registration is not evidence of current Core approval.
+Failed Core reads or native writes can therefore delay revocation handling.
+
+The legacy watcher also used subscription notifications and a separate supervised process.
+This port uses the existing serial tak-operator loop.
+It does not claim the legacy watcher's 17–85 ms timings.
+Slow Core or JNI calls can extend the interval between connection scans.
+The local legacy evidence is in
+`~/devel/pvarki/docker-rasenmaeher-integration/support-reports/tak-cot-anonymous-fallback-20260913/evidence/guard-results.txt`.
+That run used TAK 5.8-RELEASE-69 and one messaging node.
+It closed 29 invalid reconnects and preserved two valid control connections.
+All 29 early CoT messages arrived before disconnection.
+The evidence covers TLS 1.2, TLS 1.3, resumed sessions, and watcher recovery.
+It does not validate this port against TAK 5.8.92.
+Unit tests cover the port's certificate selection, retries, permission refresh, and node routing.
+Disconnection occurs after authentication. It does not establish strict admission.
+UserBindings remain `Synced=False` with `EnforcementUnverified`.
+
+## Production adapter inputs
+
 Implement these inputs when their versioned contracts are available:
 
 1. Verified mTLS identity and fresh Core self-service authorization, including exact credential purpose, User approval/revocation, effective TAK entitlement and high-OPSEC delivery policy.

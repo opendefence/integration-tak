@@ -412,6 +412,10 @@ def run_operator(namespace: str) -> None:
                     reconciler.run_once()
                 except APIError, httpx.RequestError, ValueError:
                     _LOGGER.error("Core scan failed; no projection is marked ready")
+                try:
+                    tak.reconcile_connections()
+                except Exception:
+                    _LOGGER.error("TAK connection reconciliation failed; retry on the next scan")
                 time.sleep(10)
     finally:
         tak.close()

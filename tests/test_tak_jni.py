@@ -58,6 +58,7 @@ def native_runtime() -> tuple[tak_jni.TakJvmRuntime, dict[str, Any]]:
     runtime._user = native_user
     runtime._role = MagicMock()
     runtime._role.fromValue.side_effect = role
+    runtime._subscriptions = MagicMock()
     return runtime, users
 
 
@@ -112,6 +113,7 @@ def test_native_partial_writes_recover_by_readback(
         runtime.reconcile_user(USER_UID, (first,), "ROLE_READONLY", ())
     restarted = tak_jni.TakJvmRuntime()
     restarted._manager = runtime._manager
+    restarted._subscriptions = MagicMock()
     restarted.reconcile_user(USER_UID, (), None, ())
     assert users == {}
 
@@ -130,6 +132,94 @@ def test_native_conflicts_and_failed_removal(native_runtime: tuple[tak_jni.TakJv
     with pytest.raises(RuntimeError, match="unverified"):
         runtime.reconcile_user(USER_UID, (), None, ())
     assert len(users) == 1
+
+
+def test_connection_refresh_tracks_changes_and_recovers_after_restart(
+    native_runtime: tuple[tak_jni.TakJvmRuntime, dict[str, Any]],
+) -> None:
+    runtime, _users = native_runtime
+    first, second = credentials()
+    backend = MagicMock()
+    runtime._subscriptions = backend
+    kicks: list[set[str]] = []
+
+    def record(pending: set[str]) -> None:
+        kicks.append(set(pending))
+
+    backend.reconcile.side_effect = record
+    runtime.reconcile_user(USER_UID, (first, second), "ROLE_ADMIN", ("team",))
+    runtime.reconcile_user(USER_UID, (first, second), "ROLE_ADMIN", ("team",))
+    assert kicks == [{first.fingerprint_sha256, second.fingerprint_sha256}]
+    runtime.reconcile_user(USER_UID, (first, second), "ROLE_READONLY", ())
+    assert kicks[-1] == {first.fingerprint_sha256, second.fingerprint_sha256}
+    runtime.reconcile_user(USER_UID, (second,), "ROLE_READONLY", ())
+    assert kicks[-1] == {first.fingerprint_sha256}
+    # Native state can match after an interrupted update. A fresh process still kicks once.
+    runtime._connection_permissions.clear()
+    runtime.reconcile_user(USER_UID, (second,), "ROLE_READONLY", ())
+    assert kicks[-1] == {second.fingerprint_sha256}
+    runtime.reconcile_user(USER_UID, (), None, ())
+    assert kicks[-1] == {second.fingerprint_sha256}
+
+
+def test_failed_kick_retries_after_native_record_is_gone(
+    native_runtime: tuple[tak_jni.TakJvmRuntime, dict[str, Any]],
+) -> None:
+    runtime, users = native_runtime
+    first, _ = credentials()
+    runtime.reconcile_user(USER_UID, (first,), "ROLE_READONLY", ())
+    backend = MagicMock()
+    runtime._subscriptions = backend
+    backend.reconcile.side_effect = TimeoutError
+    with pytest.raises(TimeoutError):
+        runtime.reconcile_user(USER_UID, (), None, ())
+    assert users == {}
+    assert runtime._pending_disconnects == {first.fingerprint_sha256}
+    kicks: list[set[str]] = []
+
+    def record(pending: set[str]) -> None:
+        kicks.append(set(pending))
+
+    backend.reconcile.side_effect = record
+    runtime.reconcile_user(USER_UID, (), None, ())
+    assert kicks == [{first.fingerprint_sha256}]
+    assert not runtime._pending_disconnects
+
+
+def test_failed_registration_removal_still_kicks(
+    native_runtime: tuple[tak_jni.TakJvmRuntime, dict[str, Any]],
+) -> None:
+    runtime, users = native_runtime
+    first, _ = credentials()
+    runtime.reconcile_user(USER_UID, (first,), "ROLE_READONLY", ())
+    runtime._manager.removeUser.side_effect = TimeoutError
+    backend = MagicMock()
+    runtime._subscriptions = backend
+    kicks: list[set[str]] = []
+
+    def record(pending: set[str]) -> None:
+        kicks.append(set(pending))
+
+    backend.reconcile.side_effect = record
+    with pytest.raises(RuntimeError, match="removal is unverified"):
+        runtime.reconcile_user(USER_UID, (), None, ())
+    assert users and kicks == [{first.fingerprint_sha256}]
+
+
+def test_connection_scan_uses_one_backend_and_checks_runtime(
+    native_runtime: tuple[tak_jni.TakJvmRuntime, dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime, _users = native_runtime
+    runtime._subscriptions = None
+    factory = MagicMock()
+    monkeypatch.setattr(tak_jni, "SubscriptionBackend", factory)
+    runtime.reconcile_connections()
+    runtime.reconcile_connections()
+    factory.assert_called_once()
+    assert factory.return_value.reconcile.call_count == 2
+    runtime.close()
+    with pytest.raises(RuntimeError, match="unavailable"):
+        runtime.reconcile_connections()
 
 
 def test_start_configures_one_jvm_and_closes_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

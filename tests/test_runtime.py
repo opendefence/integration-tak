@@ -47,7 +47,10 @@ def test_api_runtime_discovery_and_safe_server_config(tmp_path: Path, monkeypatc
 
 
 @pytest.mark.parametrize("failure", [False, True])
-def test_operator_runtime_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool) -> None:
+@pytest.mark.parametrize("connection_failure", [False, True])
+def test_operator_runtime_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: bool, connection_failure: bool
+) -> None:
     fixture = KubernetesFixture()
     fixture.put(core_user(), "users")
     config = fixture.configuration(tmp_path)
@@ -90,10 +93,17 @@ def test_operator_runtime_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, 
         def close(self) -> None:
             jni_calls.append("close")
 
+        def reconcile_connections(self) -> None:
+            jni_calls.append("connections")
+            if connection_failure:
+                raise ConnectionError("unavailable")
+
     monkeypatch.setattr(operator, "TakJvmRuntime", TakFixture)
     with pytest.raises(KeyboardInterrupt):
         operator.run_operator("tak")
-    assert jni_calls == (["start", "check", "close"] if failure else ["start", "check", "project", "close"])
+    assert jni_calls == (
+        ["start", "check", "connections", "close"] if failure else ["start", "check", "project", "connections", "close"]
+    )
     if not failure:
         binding = next(item for item in fixture.objects.values() if isinstance(item, UserBinding))
         assert condition(binding).reason == "EnforcementUnverified"

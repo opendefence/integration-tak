@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 from uuid import UUID
 
 from opendefence_integration_tak.certificates import PublicCredential
+from opendefence_integration_tak.subscriptions import SubscriptionBackend
 
 # Only creates trusted configuration XML.
 import xml.etree.ElementTree as ET  # nosec B405
@@ -72,6 +73,9 @@ class TakJvmRuntime:
         self._ssl: Any = None
         self._role: Any = None
         self._user: Any = None
+        self._subscriptions: SubscriptionBackend | None = None
+        self._pending_disconnects: set[str] = set()
+        self._connection_permissions: dict[str, tuple[str | None, frozenset[str]]] = {}
         self._closed = False
 
     def _configuration(self) -> Path:
@@ -223,16 +227,45 @@ class TakJvmRuntime:
             }
             for identifier, current in managed.items():
                 self._check_certificate_record(identifier, current)
-            for identifier in sorted(managed.keys() - desired.keys()):
-                try:
-                    self._manager.removeUser(identifier)
-                except Exception:
-                    if self._manager.getFirstUser(identifier) is not None:
-                        raise RuntimeError("TAK certificate removal is unverified") from None
-                if self._manager.getFirstUser(identifier) is not None:
-                    raise RuntimeError("TAK certificate removal is unverified")
-            for identifier, fingerprint in sorted(desired.items()):
-                self._project_certificate(identifier, fingerprint, role, frozenset(groups))
+            permissions = (role, frozenset(groups))
+            removed = managed.keys() - desired.keys()
+            self._pending_disconnects.update(identifier[-64:] for identifier in removed)
+            for identifier, fingerprint in desired.items():
+                if self._connection_permissions.get(identifier[-64:]) != permissions or not self._matches(
+                    managed.get(identifier), fingerprint, *permissions
+                ):
+                    self._pending_disconnects.add(identifier[-64:])
+            try:
+                for identifier in sorted(removed):
+                    self._remove_certificate(identifier)
+                for identifier, fingerprint in sorted(desired.items()):
+                    self._project_certificate(identifier, fingerprint, *permissions)
+            finally:
+                # A failed registration write must not prevent the disconnect attempt.
+                if self._pending_disconnects:
+                    self.reconcile_connections()
+            for identifier in desired:
+                self._connection_permissions[identifier[-64:]] = permissions
+
+    def reconcile_connections(self) -> None:
+        """Retry failed kicks and inspect reconnects in the tak-operator JVM."""
+        with self._lock:
+            if self.pid != os.getpid() or self._manager is None or self._closed:
+                raise RuntimeError("TAK JVM is unavailable")
+            if self._subscriptions is None:
+                self._subscriptions = SubscriptionBackend()
+            self._subscriptions.reconcile(self._pending_disconnects)
+            self._pending_disconnects.clear()
+
+    def _remove_certificate(self, identifier: str) -> None:
+        try:
+            self._manager.removeUser(identifier)
+        except Exception:
+            if self._manager.getFirstUser(identifier) is not None:
+                raise RuntimeError("TAK certificate removal is unverified") from None
+        if self._manager.getFirstUser(identifier) is not None:
+            raise RuntimeError("TAK certificate removal is unverified")
+        self._connection_permissions.pop(identifier[-64:], None)
 
     @staticmethod
     def _check_certificate_record(identifier: str, current: Any) -> None:

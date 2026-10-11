@@ -26,6 +26,11 @@ The tak-operator now uses `JniProjector` to apply a separate native record for e
 It applies the User's role and group names to each record through JNI.
 It removes an old certificate record without changing the remaining records.
 Native readback verifies every write, including uncertain writes.
+The tak-operator now reuses the connection removal code from python-tak-rmapi PR #155.
+It refreshes sessions after permission changes and retries failed kicks.
+Its regular scan removes expired and unregistered CoT identities.
+The port has unit tests. Its TAK 5.8.92 behavior and latency still need live checks.
+See [CoT connection removal](api-operator.md#cot-connection-removal) for the legacy evidence and port limits.
 Strict admission remains unverified, so bindings report `EnforcementUnverified`.
 The stack Kustomization composes the sibling TAK Server integrated overlay with the
 integration workloads. Separate entry points render the schema and grants Jobs.
