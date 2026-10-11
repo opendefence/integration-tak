@@ -15,6 +15,7 @@ from opendefence_integration_tak.certificates import ACCEPTED_CREDENTIALS_ANNOTA
 
 from opendefence_integration_tak.operator import (
     BindingReconciler,
+    CredentialProjection,
     ProjectionReceipt,
     UnavailableProjector,
     binding_name,
@@ -72,6 +73,7 @@ class FixtureProjector:
         self.receipt: ProjectionReceipt | None = None
         self.failure = False
         self.mutate: User | None = None
+        self.seen_previous: list[tuple[PublicCredential, ...]] = []
         self.seen_credentials: list[tuple[PublicCredential, ...]] = []
 
     def reconcile(
@@ -79,12 +81,13 @@ class FixtureProjector:
         user: User,
         groups: list[Group],
         roles: list[Role],
-        credentials: tuple[PublicCredential, ...],
+        credentials: CredentialProjection,
         revision: str,
     ) -> ProjectionReceipt:
-        self.seen_credentials.append(credentials)
-        if credentials:
-            assert len(credentials) == 1 and credentials[0].fingerprint_sha256 == "a" * 64
+        self.seen_previous.append(credentials.previous)
+        self.seen_credentials.append(credentials.desired)
+        if credentials.desired:
+            assert len(credentials.desired) == 1 and credentials.desired[0].fingerprint_sha256 == "a" * 64
         if self.failure:
             raise RuntimeError("fixture partial write")
         if self.mutate is not None:
@@ -138,6 +141,8 @@ def test_full_readback_and_refresh() -> None:
     assert len(fixture.writes) == 5
     assert binding.metadata and binding.metadata.annotations
     assert binding.metadata.annotations["integration.opendefence.fi/applied-revision"] == "strict-v1"
+    saved = json.loads(binding.metadata.annotations["integration.opendefence.fi/applied-credentials"])
+    assert saved["credentials"][0]["fingerprintSha256"] == "a" * 64
     projector.receipt = ProjectionReceipt(
         input_revision(user, [], []), "strict-v2", "strict-v2", "strict-v1", datetime.now(UTC) + timedelta(minutes=5)
     )
@@ -336,8 +341,54 @@ def test_removed_credentials_reach_projector_before_binding_stays_unready() -> N
     assert condition(worker.reconcile(user, [], [])).status == "True"
     assert user.metadata is not None
     user.metadata.annotations = {}
+    revision = input_revision(user, [], [])
+    projector.receipt = ProjectionReceipt(
+        revision, "strict-v2", "strict-v2", "old", datetime.now(UTC) + timedelta(minutes=5)
+    )
+    assert condition(worker.reconcile(user, [], [])).reason == "ProjectionUnverified"
+    binding = worker.bindings.get(binding_name(user), "tak")
+    assert binding.metadata and binding.metadata.annotations
+    saved = json.loads(binding.metadata.annotations["integration.opendefence.fi/applied-credentials"])
+    assert saved["credentials"][0]["fingerprintSha256"] == "a" * 64
+    projector.receipt = None
     assert condition(worker.reconcile(user, [], [])).status == "False"
+    assert projector.seen_previous[-1] == projector.seen_credentials[0]
     assert projector.seen_credentials[-1] == ()
+    binding = worker.bindings.get(binding_name(user), "tak")
+    assert binding.metadata and binding.metadata.annotations
+    saved = json.loads(binding.metadata.annotations["integration.opendefence.fi/applied-credentials"])
+    assert saved["credentials"] == []
+
+
+def test_applied_credentials_survive_reconciler_restart() -> None:
+    first = FixtureProjector()
+    worker, _, user = reconciler(first)
+    worker.reconcile(user, [], [])
+    restarted = BindingReconciler(worker.users, worker.groups, worker.roles, worker.bindings, FixtureProjector())
+    assert user.metadata is not None
+    user.metadata.annotations = {}
+    assert condition(restarted.reconcile(user, [], [])).reason == "CredentialsUnavailable"
+    assert isinstance(restarted.projector, FixtureProjector)
+    assert restarted.projector.seen_previous[-1] == first.seen_credentials[0]
+
+
+def test_invalid_applied_state_recovers_from_verified_projection() -> None:
+    projector = FixtureProjector()
+    worker, fixture, user = reconciler(projector)
+    worker.reconcile(user, [], [])
+    binding = next(resource for resource in fixture.objects.values() if isinstance(resource, UserBinding))
+    assert binding.metadata and binding.metadata.annotations
+    binding.metadata.annotations["integration.opendefence.fi/applied-credentials"] = "broken"
+    fixture.put(binding, "userbindings")
+    worker.projector = UnavailableProjector()
+    assert condition(worker.reconcile(user, [], [])).reason == "AuthorityUnavailable"
+    assert binding.metadata.annotations["integration.opendefence.fi/applied-credentials"] == "broken"
+    worker.projector = projector
+    assert condition(worker.reconcile(user, [], [])).reason == "ProjectionVerified"
+    assert projector.seen_previous[-1] == ()
+    updated = worker.bindings.get(binding_name(user), "tak")
+    assert updated.metadata and updated.metadata.annotations
+    assert updated.metadata.annotations["integration.opendefence.fi/applied-credentials"] != "broken"
 
 
 @pytest.mark.parametrize("change", ["unapproved", "revoked"])

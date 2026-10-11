@@ -19,6 +19,7 @@ from opendefence_integration_tak.certificates import (
     ACCEPTED_CREDENTIALS_ANNOTATION,
     PublicCredential,
     accepted_credential_records,
+    public_credential_records,
 )
 from opendefence_integration_tak.tak_jni import TakJvmRuntime
 
@@ -39,6 +40,7 @@ _MANAGER = "opendefence-integration-tak"
 _REVISION = "integration.opendefence.fi/input-revision"
 _USER_UID = "integration.opendefence.fi/user-uid"
 _APPLIED_REVISION = "integration.opendefence.fi/applied-revision"
+_APPLIED_CREDENTIALS = "integration.opendefence.fi/applied-credentials"
 _VALID_UNTIL = "integration.opendefence.fi/valid-until"
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,18 +66,26 @@ class ProjectionReceipt:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class CredentialProjection:
+    previous: tuple[PublicCredential, ...]
+    desired: tuple[PublicCredential, ...]
+
+
 class Projector(Protocol):
     def reconcile(
         self,
         user: User,
         groups: list[Group],
         roles: list[Role],
-        credentials: tuple[PublicCredential, ...],
+        credentials: CredentialProjection,
         revision: str,
     ) -> ProjectionReceipt:
         """Apply the full approved set and permissions; read back uncertain writes.
 
-        An empty credential set removes previously applied certificate access.
+        Previous credentials include expired records and are only a retry hint.
+        Read TAK state because the binding may predate this annotation or a write may be partial.
+        An empty desired set removes access.
         Implementations own one JVM in this process and return Python values only.
         A receipt requires verified messaging AND API enforcement. Never synthesize
         it from file-auth or scalar registerCert results.
@@ -89,7 +99,7 @@ class UnavailableProjector:
         user: User,
         groups: list[Group],
         roles: list[Role],
-        credentials: tuple[PublicCredential, ...],
+        credentials: CredentialProjection,
         revision: str,
     ) -> ProjectionReceipt:
         raise ProjectionUnavailable
@@ -142,6 +152,17 @@ def accepted_user_credentials(user: User, now: datetime) -> tuple[PublicCredenti
             now=now,
         )
     except ValueError:
+        return ()
+
+
+def applied_credentials(binding: UserBinding) -> tuple[PublicCredential, ...]:
+    raw = (binding.metadata.annotations or {}).get(_APPLIED_CREDENTIALS) if binding.metadata else None
+    if raw is None:
+        return ()
+    try:
+        return public_credential_records(raw)
+    except ValueError:
+        _LOGGER.warning("Invalid applied credential hint; reconcile from TAK state")
         return ()
 
 
@@ -226,6 +247,39 @@ class BindingReconciler:
             return self.bindings.update_status(binding)
         return binding
 
+    def _record_applied(
+        self, binding: UserBinding, receipt: ProjectionReceipt, credentials: tuple[PublicCredential, ...]
+    ) -> UserBinding:
+        if binding.metadata is None:
+            raise ValueError("Binding metadata is missing")
+        annotations = binding.metadata.annotations or {}
+        records = json.dumps(
+            {
+                "version": 1,
+                "credentials": [
+                    {
+                        "fingerprintSha256": record.fingerprint_sha256,
+                        "serialHex": record.serial_hex,
+                        "issuerId": record.issuer_id,
+                        "notBefore": record.not_before.isoformat(),
+                        "notAfter": record.not_after.isoformat(),
+                    }
+                    for record in credentials
+                ],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        applied = {
+            _APPLIED_REVISION: receipt.desired_revision,
+            _APPLIED_CREDENTIALS: records,
+            _VALID_UNTIL: receipt.valid_until.isoformat(),
+        }
+        if any(annotations.get(key) != value for key, value in applied.items()):
+            binding.metadata.annotations = annotations | applied
+            return self.bindings.update(binding)
+        return binding
+
     def reconcile(self, user: User, groups: list[Group], roles: list[Role]) -> UserBinding:
         revision = input_revision(user, groups, roles)
         binding = self._binding(user)
@@ -239,10 +293,13 @@ class BindingReconciler:
                 raise ValueError("Binding metadata is missing")
             binding.metadata.annotations = annotations | {_REVISION: revision, _USER_UID: user.metadata.uid or ""}
             binding = self.bindings.update(binding)
+        previous_credentials = applied_credentials(binding)
         credentials = accepted_user_credentials(user, datetime.now(UTC))
         invalid_credentials = not credentials
         try:
-            receipt = self.projector.reconcile(user, groups, roles, credentials, revision)
+            receipt = self.projector.reconcile(
+                user, groups, roles, CredentialProjection(previous_credentials, credentials), revision
+            )
         except ProjectionUnavailable:
             return self._status(
                 binding, False, "CredentialsUnavailable" if invalid_credentials else "AuthorityUnavailable"
@@ -250,14 +307,12 @@ class BindingReconciler:
         except Exception:
             self._status(binding, False, "ProjectionFailed")
             raise
-        if (
-            invalid_credentials
-            or not receipt.current(revision, datetime.now(UTC))
-            or receipt.valid_until > min(record.not_after for record in credentials)
+        if not receipt.current(revision, datetime.now(UTC)) or (
+            credentials and receipt.valid_until > min(record.not_after for record in credentials)
         ):
-            return self._status(
-                binding, False, "CredentialsUnavailable" if invalid_credentials else "ProjectionUnverified"
-            )
+            return self._status(binding, False, "ProjectionUnverified")
+        if invalid_credentials:
+            return self._status(self._record_applied(binding, receipt, ()), False, "CredentialsUnavailable")
         if user.name is None:
             raise ValueError("Core User name is missing")
         try:
@@ -268,13 +323,7 @@ class BindingReconciler:
             raise
         if input_revision(fresh_user, fresh_groups, fresh_roles) != revision:
             return self._status(binding, False, "InputsChanged")
-        if binding.metadata is None:
-            raise ValueError("Binding metadata is missing")
-        annotations = binding.metadata.annotations or {}
-        applied = {_APPLIED_REVISION: receipt.desired_revision, _VALID_UNTIL: receipt.valid_until.isoformat()}
-        if any(annotations.get(key) != value for key, value in applied.items()):
-            binding.metadata.annotations = annotations | applied
-            binding = self.bindings.update(binding)
+        binding = self._record_applied(binding, receipt, credentials)
         if not receipt.current(revision, datetime.now(UTC)):
             return self._status(binding, False, "ProjectionUnverified")
         return self._status(binding, True, "ProjectionVerified")

@@ -24,6 +24,7 @@ from opendefence_integration_tak.certificates import (
     ca_truststore,
     client_keystore,
     public_credential,
+    public_credential_records,
 )
 from tests.conftest import CredentialFixture
 
@@ -99,6 +100,8 @@ def test_core_public_record_metadata_is_complete_and_current(material: Credentia
     assert {entry.serial_hex for entry in overlapping} == {"2", record.serial_hex}
     expired = item | {"notAfter": material.now.isoformat()}
     successor = next(entry for entry in overlapping if entry.serial_hex == "2")
+    assert public_credential_records(json.dumps({"version": 1, "credentials": [expired]}))[0].not_after == material.now
+    assert public_credential_records('{"version":1,"credentials":[]}') == ()
     assert accepted_credential_records(
         json.dumps({"version": 1, "credentials": [expired, replacement]}), now=material.now
     ) == (successor,)

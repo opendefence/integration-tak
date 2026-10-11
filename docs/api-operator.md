@@ -129,7 +129,7 @@ User binding observations are excluded to prevent feedback loops.
 Projection failure, stale readback, authority failure, or a concurrent Core edit prevents `Synced=True`.
 The operator re-reads Core resources before publishing a successful status.
 
-Integration-owned annotations record User UID, input revision, applied revision and receipt deadline.
+Integration-owned annotations record User UID, input revision, applied revision, public applied credentials, and receipt deadline.
 They use the `integration.opendefence.fi` prefix.
 These annotations are an internal projection record, not a new Core CRD or an agreed Core authorization contract.
 Binding `observedGeneration` alone cannot establish freshness of referenced resources.
@@ -146,6 +146,10 @@ Delivery compares Core's selected public credential record with the certificate 
 The operator reads the provisional accepted-credential User annotation and includes it in its input revision.
 It passes only current, valid public records to a projector. Missing or malformed metadata leaves the UserBinding unready.
 It passes an empty set when metadata is invalid or the User is unapproved or revoked, so a strict projector can remove old access.
+It passes the last verified applied records to the projector, including expired records.
+It writes the new applied set only after a verified projection receipt.
+It logs a malformed applied record and asks the projector to recover from TAK state.
+It replaces the record only after verified readback.
 It rejects a projection receipt that stays valid beyond the earliest accepted certificate expiry.
 The current TAK server still needs a compatible account mapping and strict fingerprint enforcement.
 

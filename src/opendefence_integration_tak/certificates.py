@@ -41,10 +41,10 @@ class PublicCredential:
     not_after: datetime
 
 
-def accepted_credential_records(raw: str | None, *, now: datetime) -> tuple[PublicCredential, ...]:
-    """Read Core's provisional complete accepted set. Invalid metadata grants no access."""
-    if now.utcoffset() is None or not raw or len(raw) > 64_000:
-        raise ValueError("Accepted credential metadata is unavailable")
+def public_credential_records(raw: str | None) -> tuple[PublicCredential, ...]:
+    """Read a complete public credential set, including expired records."""
+    if not raw or len(raw) > 64_000:
+        raise ValueError("Credential metadata is unavailable")
 
     def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
         result = dict(pairs)
@@ -64,8 +64,8 @@ def accepted_credential_records(raw: str | None, *, now: datetime) -> tuple[Publ
     ):
         raise ValueError("Accepted credential metadata has an unsupported version")
     items = payload["credentials"]
-    if not isinstance(items, list) or not 0 < len(items) <= 32:
-        raise ValueError("Accepted credential set is empty or too large")
+    if not isinstance(items, list) or len(items) > 32:
+        raise ValueError("Credential set is too large or malformed")
     records: list[PublicCredential] = []
     identities: set[tuple[str, str]] = set()
     fingerprints: set[str] = set()
@@ -91,11 +91,18 @@ def accepted_credential_records(raw: str | None, *, now: datetime) -> tuple[Publ
             raise ValueError("Accepted credential record is duplicated")
         fingerprints.add(fingerprint)
         identities.add((issuer, serial))
-        if not_before <= now < not_after:
-            records.append(PublicCredential(fingerprint, serial, issuer, not_before, not_after))
+        records.append(PublicCredential(fingerprint, serial, issuer, not_before, not_after))
+    return tuple(sorted(records, key=lambda record: record.fingerprint_sha256))
+
+
+def accepted_credential_records(raw: str | None, *, now: datetime) -> tuple[PublicCredential, ...]:
+    """Read Core's provisional accepted set. Invalid metadata grants no access."""
+    if now.utcoffset() is None:
+        raise ValueError("An aware verification time is required")
+    records = tuple(record for record in public_credential_records(raw) if record.not_before <= now < record.not_after)
     if not records:
         raise ValueError("No accepted credential is currently valid")
-    return tuple(sorted(records, key=lambda record: record.fingerprint_sha256))
+    return records
 
 
 def _certificates(pem: bytes) -> list[x509.Certificate]:

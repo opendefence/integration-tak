@@ -301,6 +301,8 @@ The operator provisionally reads `platform.opendefence.fi/accepted-credentials` 
 It includes that annotation in the input revision and passes current public records to the projector.
 Missing or malformed metadata keeps UserBinding readiness false. The production projector remains unavailable.
 The operator passes an empty set when metadata is invalid or the User is unapproved or revoked.
+It keeps the last verified public credential set in `integration.opendefence.fi/applied-credentials` on the UserBinding.
+The projector receives that prior set after a restart. A malformed record requires TAK readback before it is replaced.
 No live TAK deprovisioning is claimed.
 
 ## Next action
