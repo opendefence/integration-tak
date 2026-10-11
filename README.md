@@ -54,6 +54,7 @@ zarf dev lint . --flavor local-dev \
 ```
 Run `task --yes core:crds` to install the `platform.opendefence.fi/v1alpha1` Core CRDs before a manual deployment.
 This task does not start the core-operator or change simulated User projections.
+Core owns these shared CRDs. The integration package does not include them.
 The package registers the cluster-scoped `Integration/integration-tak` resource.
 It declares product information and intended network access.
 It declares no extra roles; the tak-operator still trusts User role and group projections.
@@ -145,6 +146,7 @@ The tak-operator build reads `UserManager.jar` from the same TAK Server image th
 The runtime check compares the JAR hash with that source image before packaging.
 CI archives contain the exact locally built API and tak-operator images, read through an OCI image archive.
 The build uploads the production archives as `zarf-amd64` and `zarf-arm64` workflow artifacts.
+CI rejects archives whose rendered manifests include `platform.opendefence.fi` CRDs.
 The `local-dev` flavor is linted but is not published.
 
 Publishing uses `arc-runner-set` and the shared image publisher.

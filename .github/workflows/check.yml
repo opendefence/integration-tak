@@ -194,6 +194,13 @@ jobs:
             echo 'Expected exactly one Zarf package archive' >&2
             exit 1
           fi
+          # Core owns its CRDs; Zarf removal must never delete them.
+          zarf package inspect manifests "${packages[0]}" \
+            --set-variables PUBLIC_ORIGIN=https://example.invalid,TAK_SERVER_ADDRESS=tak.example.invalid \
+            > "$build_dir/manifests.yaml"
+          zarf tools yq eval-all --exit-status \
+            '[select(.kind == "CustomResourceDefinition" and .spec.group == "platform.opendefence.fi")] | length == 0' \
+            "$build_dir/manifests.yaml"
           echo "archive=${packages[0]}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:

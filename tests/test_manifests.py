@@ -21,6 +21,11 @@ def test_integration_registration(overlay: str) -> None:
         [kubectl, "kustomize", str(root / "k8s" / overlay)], text=True, timeout=30
     )
     resources = list(yaml.safe_load_all(rendered))
+    assert not [
+        item["metadata"]["name"]
+        for item in resources
+        if item["kind"] == "CustomResourceDefinition" and item["spec"]["group"] == "platform.opendefence.fi"
+    ], "Core owns its shared CRDs; integration packages must not install or remove them"
     registrations = [item for item in resources if item["kind"] == "Integration"]
     assert len(registrations) == 1
     integration = Integration.model_validate(registrations[0])
