@@ -47,7 +47,7 @@ Run this command to deploy the local package:
 zarf dev deploy --connected --flavor local-dev --components integration-local-dev \
   --deploy-set-variables PUBLIC_ORIGIN=https://local-dev.opendefence.fi \
   --deploy-set-variables API_IMAGE=localhost/opendefence-integration-tak-api:i2-http-operator \
-  --deploy-set-variables OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-http-operator
+  --deploy-set-variables OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-jni
 ```
 
 Run `zarf package create . --flavor local-dev` to build an archive.
@@ -69,7 +69,7 @@ The prototype's server deployments are not copied.
 ## Images
 
 Run `podman build --target api -t localhost/opendefence-integration-tak-api:i2-http-operator .` to build the API.
-Run `podman build --target operator -t localhost/opendefence-integration-tak-operator:i2-http-operator .` to build the operator runtime.
+Run `podman build --target operator --build-arg TAKSERVER_IMAGE=localhost/tak-server:release-92 -t localhost/opendefence-integration-tak-operator:i2-jni .` to build the current operator runtime.
 Both images currently print help by default.
 Both images run as UID 10001.
 The API image contains no Java runtime or JNI dependency.
@@ -86,7 +86,7 @@ Use this command to check each runtime image:
 
 ```sh
 podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-api:i2-http-operator - api < docker/check_runtime.py
-podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-operator:i2-http-operator - operator < docker/check_runtime.py
+podman run --rm -i --entrypoint python localhost/opendefence-integration-tak-operator:i2-jni - operator --jar-sha256 0fe547c2f4ce05d06a2e9724e0c2837eab0a0ba5be398390bb974b2385ce6f14 < docker/check_runtime.py
 ```
 
 The operator check starts one JVM and calls a class from the actual JAR.

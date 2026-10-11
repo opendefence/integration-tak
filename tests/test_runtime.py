@@ -64,8 +64,27 @@ def test_operator_runtime_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, 
 
     monkeypatch.setattr(operator, "cluster_config", configured)
     monkeypatch.setattr(operator.time, "sleep", stop)
+
+    def missing_path(_name: str) -> Path:
+        return tmp_path / "missing"
+
+    monkeypatch.setattr(operator, "Path", missing_path)
+    jni_calls: list[str] = []
+
+    class TakFixture:
+        def start(self) -> None:
+            jni_calls.append("start")
+
+        def check(self) -> None:
+            jni_calls.append("check")
+
+        def close(self) -> None:
+            jni_calls.append("close")
+
+    monkeypatch.setattr(operator, "TakJvmRuntime", TakFixture)
     with pytest.raises(KeyboardInterrupt):
         operator.run_operator("tak")
+    assert jni_calls == ["start", "check", "close"]
     if not failure:
         binding = next(item for item in fixture.objects.values() if isinstance(item, UserBinding))
         assert condition(binding).reason == "AuthorityUnavailable"

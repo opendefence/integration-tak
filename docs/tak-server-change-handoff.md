@@ -42,6 +42,12 @@ Sibling links require these local checkouts; provide their files or equivalent c
 | Integration | Core-to-TAK projection, separate JNI process, projection readback, selected observer/guard, client ZIP API, grants, and UI. Consume the server base; do not copy it. |
 | Core | Immutable identity, effective permissions, approved credential inventory, purpose/generation mapping, issuance, durable activation evidence, and predecessor revocation. |
 
+The integration can create a dedicated mTLS certificate for its access to TAK's port 8443 REST API.
+Its operator registers that certificate as a trusted administrator through JNI.
+TAK must also trust the certificate for TLS client authentication.
+Strict mode must explicitly approve the certificate before the REST API can use it.
+Keep the private key in an integration-owned Secret and outside the delivery API Pod.
+
 Use the current candidate only as a recorded baseline:
 
 | Item | Recorded value |

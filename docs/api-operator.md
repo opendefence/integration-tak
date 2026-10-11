@@ -23,7 +23,18 @@ Missing or empty projected tokens fail without sending the initial token as a fa
 Kubeconfig authentication remains owned by Cloudcoil.
 The operator extra remains separate and pins PyJNIus to `1.7.0`.
 Imports and help/version commands do not start a JVM.
-The operator currently reconciles bindings without starting JNI.
+The operator starts one TAKCL JVM when its workload starts.
+It checks the remote user manager during each scan.
+It registers an optional dedicated administrator certificate through JNI.
+The operator still reports `Synced=False` because strict projection and Core authority are unavailable.
+Build the current local operator image with the selected TAK 5.8.92 server image:
+
+```sh
+podman build --target operator --build-arg TAKSERVER_IMAGE=localhost/tak-server:release-92 -t localhost/opendefence-integration-tak-operator:i2-jni .
+```
+
+Use the selected server image and JAR as one tested tuple.
+The Dockerfile default still points to the older 5.8.69 artifact.
 Do not use the legacy scalar fingerprint operation as a substitute for strict projection.
 
 ## HTTP contract
@@ -138,6 +149,20 @@ Implement these inputs when their versioned contracts are available:
 3. Strict management capability through one operator JVM, with serialized mutations, complete approved-set projection, uncertain-write readback and matching messaging/API receipts.
 4. Durable completed-authentication observations for the exact approved successor. Rotation status remains Core-owned.
 5. Trusted ingress routing, header stripping, direct-service isolation, and compatible TLS policy for protected and certificate-free routes.
+
+The integration operator uses a dedicated client certificate for TAK's port 8443 REST API.
+Supply `tak-integration-admin` with `tls.crt` in the integration namespace.
+Use `integration-tak-admin` as the certificate CN.
+Store the matching private key in the same Secret for later 8443 REST calls.
+The current JNI bootstrap mounts only the public certificate.
+The operator registers the certificate as an administrator through JNI and verifies the stored fingerprint and role.
+It rejects a different fingerprint under the same CN to avoid replacing an existing administrator.
+Ensure that TAK also trusts the certificate for TLS client authentication before using the REST API.
+In strict mode, add the exact certificate to the explicit approval state.
+Issue the certificate from a CA in TAK's client truststore.
+Certificate creation and rotation need an agreed issuer and trust update contract.
+Verify TLS authentication and administrator access after bootstrap.
+Keep this management identity separate from user credentials and the delivery API workload.
 
 ## Kubernetes composition
 

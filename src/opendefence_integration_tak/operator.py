@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import hashlib
 import json
 import logging
+from pathlib import Path
 import time
 from typing import Protocol
 
@@ -14,6 +15,7 @@ from cloudcoil.errors import APIError, ResourceConflict, ResourceNotFound
 import httpx
 
 from opendefence_integration_tak.cluster import cluster_config
+from opendefence_integration_tak.tak_jni import TakJvmRuntime
 
 from lib_opendefence_core.models.v1alpha1 import (
     API_VERSION,
@@ -244,21 +246,34 @@ class BindingReconciler:
 
 
 def run_operator(namespace: str) -> None:
-    """One serial scan for the small installation; no fork or JNI import here.
+    """One JVM and one serial scan for the small installation.
 
     shortcut: poll every ten seconds; use informers if measured scale needs them.
     """
-    with cluster_config(namespace=namespace) as config:
-        reconciler = BindingReconciler(
-            User.client(config),
-            Group.client(config),
-            Role.client(config),
-            UserBinding.client(config, namespace=namespace),
-            UnavailableProjector(),
-        )
-        while True:
-            try:
-                reconciler.run_once()
-            except APIError, httpx.RequestError, ValueError:
-                _LOGGER.error("Core scan failed; no projection is marked ready")
-            time.sleep(10)
+    tak = TakJvmRuntime()
+    try:
+        tak.start()
+        with cluster_config(namespace=namespace) as config:
+            reconciler = BindingReconciler(
+                User.client(config),
+                Group.client(config),
+                Role.client(config),
+                UserBinding.client(config, namespace=namespace),
+                UnavailableProjector(),
+            )
+            while True:
+                try:
+                    certificate = Path("/var/run/tak-admin/tls.crt")
+                    if certificate.is_file():
+                        tak.register_admin(certificate)
+                    else:
+                        tak.check()
+                except Exception:
+                    _LOGGER.error("TAK management unavailable; projection remains unready")
+                try:
+                    reconciler.run_once()
+                except APIError, httpx.RequestError, ValueError:
+                    _LOGGER.error("Core scan failed; no projection is marked ready")
+                time.sleep(10)
+    finally:
+        tak.close()

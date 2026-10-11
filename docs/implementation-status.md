@@ -6,6 +6,11 @@ I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe proves an approved-set failure.
 The current sibling candidate is TAK 5.8.92. Its strict admission hooks are installed, but the policy is not connected to authentication.
 I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
+The operator now starts one TAKCL JVM and checks the remote user manager on each scan.
+It can register a dedicated `integration-tak-admin` certificate through JNI and verify the stored fingerprint and role.
+The local 5.8.92 operator image passed the native JNI runtime check.
+The current Kind namespace has no `tak-ignite` Service, so remote management and administrator registration remain untested.
+Strict projection and Core authorization remain unavailable. UserBinding readiness stays false.
 The stack Kustomization composes the sibling TAK Server integrated overlay with the
 integration workloads. Separate entry points render the schema and grants Jobs.
 `kubectl kustomize` rendered 21 unique stack resources and both namespaced Jobs
