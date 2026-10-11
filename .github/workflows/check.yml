@@ -108,8 +108,16 @@ jobs:
           snyk-token: ${{ secrets.SNYK_TOKEN }}
 
   zarf:
-    needs: version
+    needs: [version, publish]
+    if: >-
+      !cancelled() && needs.version.result == 'success' &&
+      (needs.publish.result == 'success' ||
+       (needs.publish.result == 'skipped' && github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name != github.repository))
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -125,11 +133,20 @@ jobs:
     env:
       PACKAGE_VERSION: ${{ needs.version.outputs.version }}
       TAK_SERVER_IMAGE: ${{ vars.TAK_SERVER_IMAGE }}
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      API_IMAGE: ${{ needs.publish.outputs.api }}
+      OPERATOR_IMAGE: ${{ needs.publish.outputs.operator }}
     steps:
       - uses: actions/checkout@v7
         with:
           path: integration-tak
           persist-credentials: false
+      - uses: docker/login-action@v4
+        if: needs.publish.result == 'success'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Resolve the TAK Server source revision
         id: tak-server
         run: |
@@ -154,15 +171,22 @@ jobs:
         with:
           working_directory: integration-tak
           install_args: zarf
-      - name: Build and check the bundled runtimes
+      - name: Prepare and check the bundled runtimes
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           jar_sha256=$(docker run --rm --entrypoint sha256sum "$TAK_SERVER_IMAGE" /opt/tak/utils/UserManager.jar)
           jar_sha256="${jar_sha256%% *}"
           [[ "$jar_sha256" =~ ^[a-f0-9]{64}$ ]]
           for runtime in api operator; do
-            image="ghcr.io/$owner/integration-tak-$runtime:$PACKAGE_VERSION"
-            docker build --target "$runtime" --build-arg "TAKSERVER_IMAGE=$TAK_SERVER_IMAGE" -t "$image" .
+            if [[ "$PUBLISH_RESULT" == success ]]; then
+              image_variable="${runtime^^}_IMAGE"
+              image="${!image_variable}"
+              [[ "$image" =~ ^[^[:space:]]+@sha256:[a-f0-9]{64}$ ]]
+              docker pull "$image"
+            else
+              image="ghcr.io/$owner/integration-tak-$runtime:$PACKAGE_VERSION"
+              docker build --target "$runtime" --build-arg "TAKSERVER_IMAGE=$TAK_SERVER_IMAGE" -t "$image" .
+            fi
             docker run --rm "$image" --help
             docker run --rm "$image" --version
             docker run --rm -i --entrypoint python "$image" - "$runtime" --jar-sha256 "$jar_sha256" < docker/check_runtime.py
@@ -174,14 +198,16 @@ jobs:
           ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
-          export INTEGRATION_IMAGES_ARCHIVE="$RUNNER_TEMP/integration-images.tar"
-          docker save --output "$INTEGRATION_IMAGES_ARCHIVE" "$API_IMAGE" "$OPERATOR_IMAGE"
-          # Read the built images from the archive, even if an older registry tag exists.
-          zarf tools yq -i '
-            .metadata.version = strenv(PACKAGE_VERSION) |
-            (.components[] | select(.name == "integration-production")) |=
-              (.imageArchives = [{"path": strenv(INTEGRATION_IMAGES_ARCHIVE), "images": .images}] | del(.images))
-          ' zarf.yaml
+          zarf tools yq -i '.metadata.version = strenv(PACKAGE_VERSION)' zarf.yaml
+          if [[ "$PUBLISH_RESULT" != success ]]; then
+            # Fork PRs package local builds without registry writes.
+            export INTEGRATION_IMAGES_ARCHIVE="$RUNNER_TEMP/integration-images.tar"
+            docker save --output "$INTEGRATION_IMAGES_ARCHIVE" "$API_IMAGE" "$OPERATOR_IMAGE"
+            zarf tools yq -i '
+              (.components[] | select(.name == "integration-production")) |=
+                (.imageArchives = [{"path": strenv(INTEGRATION_IMAGES_ARCHIVE), "images": .images}] | del(.images))
+            ' zarf.yaml
+          fi
           templates="TAK_IMAGE=$TAK_SERVER_IMAGE,API_IMAGE=$API_IMAGE,OPERATOR_IMAGE=$OPERATOR_IMAGE"
           zarf dev lint . --flavor local-dev --set "$templates"
           zarf dev lint . --flavor production --set "$templates"
@@ -194,6 +220,10 @@ jobs:
             echo 'Expected exactly one Zarf package archive' >&2
             exit 1
           fi
+          zarf package inspect images "${packages[0]}" > "$build_dir/images.yaml"
+          for image in "$TAK_SERVER_IMAGE" "$API_IMAGE" "$OPERATOR_IMAGE"; do
+            IMAGE="$image" zarf tools yq --exit-status 'contains([strenv(IMAGE)])' "$build_dir/images.yaml"
+          done
           # Core owns its CRDs; Zarf removal must never delete them.
           zarf package inspect manifests "${packages[0]}" \
             --set-variables PUBLIC_ORIGIN=https://example.invalid,TAK_SERVER_ADDRESS=tak.example.invalid \
@@ -210,27 +240,43 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [version, python, images, zarf]
+    needs: [version, python, images]
     if: >-
       github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: arc-runner-set
     permissions:
       contents: read
       packages: write
+    outputs:
+      api: ${{ steps.image.outputs.api }}
+      operator: ${{ steps.image.outputs.operator }}
+    env:
+      IMAGE_TAG: ci-${{ github.run_id }}-${{ github.run_attempt }}
     strategy:
       matrix:
         runtime: [api, operator]
     steps:
       - uses: actions/checkout@v7
       - uses: pvarki/config-ci-library/.github/actions/publish-image@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+        id: build
         with:
           product: integration-tak
           component: ${{ matrix.runtime }}
           target: ${{ matrix.runtime }}
-          extra-tag: ${{ needs.version.outputs.version }}
+          extra-tag: ${{ env.IMAGE_TAG }}
           build-args: |
             TAKSERVER_IMAGE=${{ vars.TAK_SERVER_IMAGE }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve the published image digest
+        id: image
+        shell: bash
+        env:
+          IMAGE: ghcr.io/${{ steps.build.outputs.image-name }}
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          digest=$(docker buildx imagetools inspect "$IMAGE:$IMAGE_TAG" --format '{{.Manifest.Digest}}')
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "$RUNTIME=$IMAGE@$digest" >> "$GITHUB_OUTPUT"
 
   publish-zarf:
     needs: [version, zarf, publish]

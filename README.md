@@ -144,13 +144,19 @@ This label must contain the full 40-character source commit from `opendefence/ta
 CI checks out that commit to use the matching integrated overlays.
 The tak-operator build reads `UserManager.jar` from the same TAK Server image that the package contains.
 The runtime check compares the JAR hash with that source image before packaging.
-CI archives contain the exact locally built API and tak-operator images, read through an OCI image archive.
+CI publishes the API and tak-operator images before it builds the Zarf archives.
+Each image job passes its published digest to the Zarf jobs.
+The Zarf jobs pull and check these exact images.
+Each archive embeds the API, tak-operator, and TAK Server images for its architecture.
+Download one archive for offline installation on a cluster with the required base services.
+The installation does not pull these images from GHCR.
 The build uploads the production archives as `zarf-amd64` and `zarf-arm64` workflow artifacts.
 CI rejects archives whose rendered manifests include `platform.opendefence.fi` CRDs.
 The `local-dev` flavor is linted but is not published.
 
 Publishing uses `arc-runner-set` and the shared image publisher.
-CI publishes images and Zarf packages after the required checks pass.
+CI publishes images after the Python and image checks pass.
+CI publishes Zarf packages after both package builds pass.
 The publisher requires Docker CLI access and native AMD64 and ARM64 BuildKit services.
 The services must be reachable at `buildkit-amd64.buildkit.svc.cluster.local:1234`
 and `buildkit-arm64.buildkit.svc.cluster.local:1234`.
@@ -171,9 +177,10 @@ It publishes them to `ghcr.io/<owner>/integration-tak` with the shared image pub
 
 `DATE` is the UTC build time in `YYYYMMDDTHHMM` format.
 The `VERSION-local` alias contains the production flavor, as do the other published tags.
-Fork pull requests build artifacts but cannot publish or use the publishing runners.
+Fork pull requests build local images and package artifacts but cannot publish or use the publishing runners.
 The publish job updates the AMD64 and ARM64 entries in each OCI index in sequence.
-The image publisher also receives the package's version tag so connected deployments can pull matching image tags.
+The image publisher adds a `ci-RUN_ID-RUN_ATTEMPT` tag to resolve each build without tag races.
+The archives use the resulting digests, so later tag changes cannot change their images.
 
 Snyk is disabled unless `SNYK_ENABLED` is `true`.
 Set `SNYK_ORG` and the `SNYK_TOKEN` secret before enabling it.
