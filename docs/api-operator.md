@@ -117,6 +117,8 @@ do not turn Core status into an effective permission grant.
 The package narrows callsigns beyond the supplied CRD snapshot; validate installed
 Core CRDs and existing User objects against the pinned package before deploying.
 The tak-operator scans every ten seconds, with serial reconciliation and no fork.
+If a Kubernetes request fails for one User, the tak-operator continues with the other Users.
+It retries the failed User on the next scan.
 One User incarnation gets one deterministic binding name derived from its Kubernetes UID.
 The namespaced binding refers to `spec.userRef.name` and has a cluster-scoped User owner reference.
 Recreating a User with the same name produces a different binding.

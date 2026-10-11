@@ -381,6 +381,8 @@ class BindingReconciler:
                 self.reconcile(user)
             except ResourceConflict:
                 _LOGGER.warning("Binding conflict; retry on next scan")
+            except APIError, httpx.RequestError:
+                _LOGGER.error("Core request failed; retry this User on the next scan")
             except ValueError:
                 _LOGGER.error("Invalid Core identity or binding ownership; skipped this user")
             except RuntimeError:

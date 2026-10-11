@@ -437,6 +437,39 @@ def test_scan_and_conflict_retry() -> None:
         worker.run_once()
 
 
+@pytest.mark.parametrize("failure", ["api", "transport"])
+def test_user_read_failure_does_not_delay_later_revocation(monkeypatch: pytest.MonkeyPatch, failure: str) -> None:
+    projector = FixtureProjector()
+    worker, fixture, first = reconciler(projector)
+    second = core_user()
+    assert second.metadata is not None
+    second.metadata.name = "second"
+    second.metadata.uid = "second-user"
+    fixture.put(second, "users")
+    worker.run_once()
+    second.spec.revoked_at = datetime.now(UTC)
+    fixture.put(second, "users")
+    handle = fixture._handle
+
+    def failed_user(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/users/" + (first.name or "")):
+            if failure == "transport":
+                raise httpx.ReadError("fixture connection lost", request=request)
+            return httpx.Response(503, json={"message": "fixture user unavailable"})
+        return handle(request)
+
+    monkeypatch.setattr(fixture, "_handle", failed_user)
+    worker.run_once()
+    assert condition(worker.bindings.get(binding_name(first), "tak")).reason == "AuthorityUnavailable"
+    assert condition(worker.bindings.get(binding_name(second), "tak")).reason == "CredentialsUnavailable"
+    assert projector.seen_credentials[-1] == ()
+    assert projector.seen_roles[-1] is None
+
+    monkeypatch.setattr(fixture, "_handle", handle)
+    worker.run_once()
+    assert condition(worker.bindings.get(binding_name(first), "tak")).reason == "ProjectionVerified"
+
+
 def test_missing_resource_identity() -> None:
     user = User(kind="User", spec=UserSpec(callsign="test"))
     with pytest.raises(ValueError):
