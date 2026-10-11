@@ -1,19 +1,21 @@
 kind: ZarfPackageConfig
-# shortcut: API and operator images stay external; bundle pinned images for an offline release.
 metadata:
   name: integration-tak
+  version: "0.1.0"
   description: OpenDefence TAK integration API, operator, and server
 constants:
   - name: TAK_IMAGE
     value: "###ZARF_PKG_TMPL_TAK_IMAGE###"
     pattern: "^(.+@sha256:[a-f0-9]{64}|localhost/tak-server:local)$"
+  - name: API_IMAGE
+    value: "###ZARF_PKG_TMPL_API_IMAGE###"
+    pattern: '^[A-Za-z0-9._:/@-]+$'
+  - name: OPERATOR_IMAGE
+    value: "###ZARF_PKG_TMPL_OPERATOR_IMAGE###"
+    pattern: '^[A-Za-z0-9._:/@-]+$'
 variables:
   - name: PUBLIC_ORIGIN
     pattern: '^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?$'
-  - name: API_IMAGE
-    pattern: '^[A-Za-z0-9._:/@-]+$'
-  - name: OPERATOR_IMAGE
-    pattern: '^[A-Za-z0-9._:/@-]+$'
   - name: TAK_SERVER_ADDRESS
     pattern: '^[A-Za-z0-9][A-Za-z0-9.-]*$'
   - name: LDAP_UPDATE_INTERVAL
@@ -44,6 +46,7 @@ components:
   - name: integration-local-dev
     required: true
     only: {flavor: local-dev}
+    images: ["###ZARF_PKG_TMPL_API_IMAGE###", "###ZARF_PKG_TMPL_OPERATOR_IMAGE###"]
     manifests:
       - name: integration-tak
         namespace: integration-tak
@@ -68,6 +71,7 @@ components:
   - name: integration-production
     required: true
     only: {flavor: production}
+    images: ["###ZARF_PKG_TMPL_API_IMAGE###", "###ZARF_PKG_TMPL_OPERATOR_IMAGE###"]
     manifests:
       - name: integration-tak
         namespace: integration-tak

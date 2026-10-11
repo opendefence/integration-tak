@@ -47,8 +47,8 @@ Kubernetes removed the binding after the test User was deleted.
 Service-account checks allowed the API to get and update the named grant Secret.
 They denied Secret lists and access to `private-registry`.
 The tak-operator could list Users and update binding status. It could not get Secrets or create Users.
-The package bundles the TAK image. Local Kind uses loaded images for connected development deployment.
-Production needs reachable API and operator images and explicit deploy variables.
+The package bundles the API, tak-operator, and TAK Server images.
+Image selection is fixed at package creation. Local Kind uses loaded images for connected development deployment.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. The tak-operator uses
 `lib-opendefence-core==0.2.2+261011` models from the user-supplied Nexus index.

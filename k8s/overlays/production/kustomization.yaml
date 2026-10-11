@@ -13,9 +13,9 @@ patches:
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: "###ZARF_VAR_API_IMAGE###"
+        value: "###ZARF_CONST_API_IMAGE###"
   - target: {kind: Deployment, name: integration-tak-operator}
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: "###ZARF_VAR_OPERATOR_IMAGE###"
+        value: "###ZARF_CONST_OPERATOR_IMAGE###"

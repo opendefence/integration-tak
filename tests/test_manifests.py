@@ -32,3 +32,15 @@ def test_integration_registration(overlay: str) -> None:
     deployments = [item for item in resources if item["kind"] == "Deployment"]
     assert len(deployments) == 2
     assert all(item["metadata"]["namespace"] == "integration-tak" for item in deployments)
+    if overlay != "integration":
+        package = yaml.safe_load((root / "zarf.yaml").read_text())
+        assert package["metadata"]["version"] == __version__
+        flavor = overlay.removeprefix("overlays/")
+        component = next(item for item in package["components"] if item.get("only", {}).get("flavor") == flavor)
+        manifest_images = {
+            container["image"].replace("ZARF_CONST_", "ZARF_PKG_TMPL_")
+            for deployment in deployments
+            for container in deployment["spec"]["template"]["spec"]["containers"]
+        }
+        assert manifest_images == set(component["images"])
+        assert not {"API_IMAGE", "OPERATOR_IMAGE"} & {item["name"] for item in package["variables"]}

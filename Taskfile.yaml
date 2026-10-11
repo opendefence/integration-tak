@@ -88,7 +88,7 @@ tasks:
     desc: Deploy the local integration and TAK Server Zarf package
     cmds:
       - test "$(kubectl config current-context)" = {{.TAK_KUBE_CONTEXT | shellQuote}}
-      - zarf dev deploy . --connected --flavor local-dev --components integration-local-dev,tak-schema,tak-grants,tak-server --create-set {{printf "TAK_IMAGE=%s" .TAK_IMAGE | shellQuote}} --deploy-set-variables {{printf "PUBLIC_ORIGIN=%s" .PUBLIC_ORIGIN | shellQuote}} --deploy-set-variables {{printf "API_IMAGE=%s" .API_IMAGE | shellQuote}} --deploy-set-variables {{printf "OPERATOR_IMAGE=%s" .OPERATOR_IMAGE | shellQuote}} --deploy-set-variables {{printf "TAK_SERVER_ADDRESS=%s" .TAK_SERVER_ADDRESS | shellQuote}}
+      - zarf dev deploy . --connected --flavor local-dev --components integration-local-dev,tak-schema,tak-grants,tak-server --create-set {{printf "TAK_IMAGE=%s" .TAK_IMAGE | shellQuote}} --create-set {{printf "API_IMAGE=%s" .API_IMAGE | shellQuote}} --create-set {{printf "OPERATOR_IMAGE=%s" .OPERATOR_IMAGE | shellQuote}} --deploy-set-variables {{printf "PUBLIC_ORIGIN=%s" .PUBLIC_ORIGIN | shellQuote}} --deploy-set-variables {{printf "TAK_SERVER_ADDRESS=%s" .TAK_SERVER_ADDRESS | shellQuote}}
       - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak rollout restart statefulset/tak-server
 
   smoke:

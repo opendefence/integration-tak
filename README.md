@@ -44,7 +44,14 @@ Credential-update delivery remains disabled until client tests establish a suppo
 
 ## Kubernetes package
 
-Run `zarf dev lint . --flavor local-dev --set TAK_IMAGE=localhost/tak-server:local` to check the local package.
+Run this command to check the local package:
+
+```sh
+zarf dev lint . --flavor local-dev \
+  --set TAK_IMAGE=localhost/tak-server:local \
+  --set API_IMAGE=localhost/opendefence-integration-tak-api:i2-http-operator \
+  --set OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-jni
+```
 Run `task --yes core:crds` to install the `platform.opendefence.fi/v1alpha1` Core CRDs before a manual deployment.
 This task does not start the core-operator or change simulated User projections.
 The package registers the cluster-scoped `Integration/integration-tak` resource.
@@ -58,22 +65,26 @@ Run this command to redeploy the local package after its prerequisites are ready
 ```sh
 zarf dev deploy --connected --flavor local-dev --components integration-local-dev,tak-schema,tak-grants,tak-server \
   --create-set TAK_IMAGE=localhost/tak-server:local \
+  --create-set API_IMAGE=localhost/opendefence-integration-tak-api:i2-http-operator \
+  --create-set OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-jni \
   --deploy-set-variables PUBLIC_ORIGIN=https://local-dev.opendefence.fi \
-  --deploy-set-variables API_IMAGE=localhost/opendefence-integration-tak-api:i2-http-operator \
-  --deploy-set-variables OPERATOR_IMAGE=localhost/opendefence-integration-tak-operator:i2-jni \
   --deploy-set-variables TAK_SERVER_ADDRESS=tak.localtest.me
 ```
 
 The package deploys the schema Job, grants Job, and TAK Server after the integration workloads.
 It builds the TAK resources from the sibling `tak-server` checkout.
-Run `zarf package create . --flavor local-dev --set TAK_IMAGE=localhost/tak-server:local` to build a local archive.
-Use `--set-variables` with the same values when you deploy that archive.
+Run `zarf package create . --flavor local-dev` with the three `--set` image values from the lint command to build a local archive.
+Set `PUBLIC_ORIGIN` and `TAK_SERVER_ADDRESS` with `--set-variables` when you deploy that archive.
 
-The `production` flavor also includes the TAK Server image and resources.
-Set `PUBLIC_ORIGIN`, `API_IMAGE`, `OPERATOR_IMAGE`, and `TAK_SERVER_ADDRESS` before deployment.
-Set `TAK_IMAGE` to a published image digest when you create a production package.
+Both flavors contain the API, tak-operator, and TAK Server images and the relevant overlays.
+Image selection is fixed when the package is created.
+The package uses the normal TAK Server container image. It does not contain another Zarf package.
+Set `PUBLIC_ORIGIN` and `TAK_SERVER_ADDRESS` before deployment.
+Set `TAK_IMAGE`, `API_IMAGE`, and `OPERATOR_IMAGE` when you create a production package.
+Use a published TAK Server image digest for `TAK_IMAGE`.
 Provide the TAK database, passwords, and identities in `integration-tak` before deployment.
-The cluster must be able to pull the API and operator images from its registry.
+For an offline deployment, initialize Zarf before deployment so it can load the bundled images into its registry.
+Connected deployments require access to the original image registries.
 Do not use this package for production authentication until the Core adapters and strict TAK server checks pass.
 
 ## Source foundation
