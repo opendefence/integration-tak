@@ -4,7 +4,8 @@
 
 I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe proves an approved-set failure.
-The current sibling candidate is TAK 5.8.92. Its strict admission hooks are installed, but the policy is not connected to authentication.
+The current sibling candidate is TAK 5.8.92. Its strict admission agent checks test traffic.
+The server has no trusted projection writer or verified readback from both TAK JVMs.
 I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
 The operator now starts one TAKCL JVM and checks the remote user manager on each scan.
 It can register a dedicated `integration-tak-admin` certificate through JNI and verify the stored fingerprint and role.
@@ -12,6 +13,14 @@ The local 5.8.92 operator image passed the native JNI runtime check.
 The current Kind namespace has a ready `tak-ignite` Service and TAK Server StatefulSet.
 The operator registered `integration-tak-admin` through JNI, and its certificate authenticated to the 8443 REST API.
 Strict projection and Core authorization remain unavailable. UserBinding readiness stays false.
+Commit `42b6663` adds a certificate-bound TAK role request to the tak-operator projection.
+It maps projected `superadmin` to `ROLE_ADMIN` and approved Users without it to `ROLE_READONLY`.
+It reads `User.status.roles` and requires a current `status.observedGeneration`.
+Each requested grant carries the accepted certificate fingerprint and issuer plus serial.
+Removal from the accepted set requests removal of that grant.
+The Kind cluster has simulated User CRDs and no core-operator deployment.
+The simulated superadmin maps to `ROLE_ADMIN`; the basic User maps to `ROLE_READONLY`.
+The production tak-operator still uses `UnavailableProjector` and makes no native human role grants.
 The stack Kustomization composes the sibling TAK Server integrated overlay with the
 integration workloads. Separate entry points render the schema and grants Jobs.
 `kubectl kustomize` rendered the stack and both namespaced Jobs using the sibling checkout.
@@ -53,14 +62,15 @@ The completed I2 application slice and remaining adapters are described in [API 
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `96df3cf`.
+- Implementation HEAD before this checkpoint: `42b6663`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
 - Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
-- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `fe13b7d`. It fixes local Zarf restart behavior. The preceding `738df0c` sets the LDAP interval to 60 seconds. Neither commit completes strict authentication.
-- Server packaging: `61a8273` adds the integrated overlay and Zarf inputs. The integrated overlay still uses legacy authentication.
+- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts. The latest sibling commit checked was `2a5dcad`. Its strict admission agent has no trusted writer or both-JVM readback.
+- Server packaging: `61a8273` adds the integrated overlay and Zarf inputs. Its current launcher installs the strict agent. It cannot admit projected human credentials until the server has a trusted writer and both-JVM readback.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives), `3739c08` (HTTP routes, grants and binding reconciliation).
 - Integration deployment commits: `a98e6a2` (server overlay), `1b9359d` (Zarf manifest package), `2b030a4` (live deployment fix).
+- Role projection commit: `42b6663` (certificate-bound grants from User status).
 - Binary probe: `spikes/i1/`; tracked and complete for the current 5.8.84 artifacts.
 - Supplied handoff and OpenAPI files remain untracked and unchanged.
 - Prototype tooling: `b332e527c7dedf5e3f0a972b792c7d697dcace6b`.
@@ -304,6 +314,8 @@ The operator passes an empty set when metadata is invalid or the User is unappro
 It keeps the last verified public credential set in `integration.opendefence.fi/applied-credentials` on the UserBinding.
 The projector receives that prior set after a restart. A malformed record requires TAK readback before it is replaced.
 No live TAK deprovisioning is claimed.
+The latest local suite passed 288 tests, skipped 2 tests, and reached 94.54% coverage.
+Ruff, Pyrefly, Bandit, and the staged hooks passed.
 
 ## Next action
 
