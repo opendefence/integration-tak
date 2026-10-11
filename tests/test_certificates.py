@@ -3,6 +3,7 @@
 from dataclasses import replace
 from datetime import timedelta
 import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess  # nosec B404 - Runs keytool for fixture compatibility checks.
@@ -19,6 +20,7 @@ from opendefence_integration_tak.certificates import (
     MAX_CERTIFICATES,
     MAX_KEY_BYTES,
     MAX_PEM_BYTES,
+    accepted_credential_records,
     ca_truststore,
     client_keystore,
     public_credential,
@@ -77,6 +79,39 @@ def test_public_record_uses_leaf_and_issuing_key(material: CredentialFixture) ->
         public_credential([material.leaf])
     with pytest.raises(ValueError):
         public_credential([material.leaf, material.root])
+
+
+def test_core_public_record_metadata_is_complete_and_current(material: CredentialFixture) -> None:
+    record = public_credential([material.leaf, material.intermediate])
+    item = {
+        "fingerprintSha256": record.fingerprint_sha256,
+        "serialHex": record.serial_hex,
+        "issuerId": record.issuer_id,
+        "notBefore": record.not_before.isoformat(),
+        "notAfter": record.not_after.isoformat(),
+    }
+    payload = {"version": 1, "credentials": [item]}
+    assert accepted_credential_records(json.dumps(payload), now=material.now) == (record,)
+    replacement = item | {"fingerprintSha256": "c" * 64, "serialHex": "2"}
+    overlapping = accepted_credential_records(
+        json.dumps({"version": 1, "credentials": [item, replacement]}), now=material.now
+    )
+    assert {entry.serial_hex for entry in overlapping} == {"2", record.serial_hex}
+    expired = item | {"notAfter": material.now.isoformat()}
+    successor = next(entry for entry in overlapping if entry.serial_hex == "2")
+    assert accepted_credential_records(
+        json.dumps({"version": 1, "credentials": [expired, replacement]}), now=material.now
+    ) == (successor,)
+    for bad in (
+        {"version": 1, "credentials": [item, item]},
+        {"version": 1, "credentials": [item | {"issuerId": "untrusted"}]},
+        {"version": 1, "credentials": [item | {"serialHex": "00"}]},
+        {"version": 1, "credentials": [item | {"notAfter": material.now.isoformat()}]},
+    ):
+        with pytest.raises(ValueError):
+            accepted_credential_records(json.dumps(bad), now=material.now)
+    with pytest.raises(ValueError, match="duplicate keys"):
+        accepted_credential_records('{"version":1,"version":1,"credentials":[]}', now=material.now)
 
 
 @pytest.mark.parametrize(

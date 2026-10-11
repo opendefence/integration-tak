@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
+import json
+import re
 from uuid import UUID
 
 from cryptography import x509
@@ -13,6 +15,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 MAX_PEM_BYTES = 1024 * 1024
 MAX_CERTIFICATES = 32
 MAX_KEY_BYTES = 16 * 1024
+ACCEPTED_CREDENTIALS_ANNOTATION = "platform.opendefence.fi/accepted-credentials"
 # This password protects public certificates only.
 TRUSTSTORE_PASSWORD = "public"  # nosec B105  # pragma: allowlist secret
 
@@ -36,6 +39,63 @@ class PublicCredential:
     issuer_id: str
     not_before: datetime
     not_after: datetime
+
+
+def accepted_credential_records(raw: str | None, *, now: datetime) -> tuple[PublicCredential, ...]:
+    """Read Core's provisional complete accepted set. Invalid metadata grants no access."""
+    if now.utcoffset() is None or not raw or len(raw) > 64_000:
+        raise ValueError("Accepted credential metadata is unavailable")
+
+    def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise ValueError("Accepted credential metadata has duplicate keys")
+        return result
+
+    try:
+        payload: object = json.loads(raw, object_pairs_hook=unique_object)
+    except json.JSONDecodeError:
+        raise ValueError("Accepted credential metadata is malformed") from None
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"version", "credentials"}
+        or type(payload["version"]) is not int
+        or payload["version"] != 1
+    ):
+        raise ValueError("Accepted credential metadata has an unsupported version")
+    items = payload["credentials"]
+    if not isinstance(items, list) or not 0 < len(items) <= 32:
+        raise ValueError("Accepted credential set is empty or too large")
+    records: list[PublicCredential] = []
+    identities: set[tuple[str, str]] = set()
+    fingerprints: set[str] = set()
+    for item in items:
+        fields = {"fingerprintSha256", "serialHex", "issuerId", "notBefore", "notAfter"}
+        if not isinstance(item, dict) or set(item) != fields or any(not isinstance(item[key], str) for key in fields):
+            raise ValueError("Accepted credential record is malformed")
+        fingerprint, serial, issuer = item["fingerprintSha256"], item["serialHex"], item["issuerId"]
+        if (
+            re.fullmatch(r"[0-9a-f]{64}", fingerprint) is None
+            or re.fullmatch(r"[1-9a-f][0-9a-f]{0,39}", serial) is None
+            or re.fullmatch(r"issuer-sha256:[0-9a-f]{64}", issuer) is None
+        ):
+            raise ValueError("Accepted credential record has an invalid identifier")
+        try:
+            not_before = datetime.fromisoformat(item["notBefore"].replace("Z", "+00:00"))
+            not_after = datetime.fromisoformat(item["notAfter"].replace("Z", "+00:00"))
+        except ValueError:
+            raise ValueError("Accepted credential validity is malformed") from None
+        if not_before.utcoffset() is None or not_after.utcoffset() is None or not_before >= not_after:
+            raise ValueError("Accepted credential validity is malformed")
+        if fingerprint in fingerprints or (issuer, serial) in identities:
+            raise ValueError("Accepted credential record is duplicated")
+        fingerprints.add(fingerprint)
+        identities.add((issuer, serial))
+        if not_before <= now < not_after:
+            records.append(PublicCredential(fingerprint, serial, issuer, not_before, not_after))
+    if not records:
+        raise ValueError("No accepted credential is currently valid")
+    return tuple(sorted(records, key=lambda record: record.fingerprint_sha256))
 
 
 def _certificates(pem: bytes) -> list[x509.Certificate]:

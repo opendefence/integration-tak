@@ -3,6 +3,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from datetime import tzinfo
+import json
 
 from cloudcoil.apimachinery import ObjectMeta, Time
 from cloudcoil.errors import APIError
@@ -10,6 +11,7 @@ import pytest
 import httpx
 
 from opendefence_integration_tak import operator
+from opendefence_integration_tak.certificates import ACCEPTED_CREDENTIALS_ANNOTATION, PublicCredential
 
 from opendefence_integration_tak.operator import (
     BindingReconciler,
@@ -38,10 +40,30 @@ from tests.kubernetes import KubernetesFixture
 
 
 def core_user() -> User:
+    now = datetime.now(UTC)
+    credentials = json.dumps(
+        {
+            "version": 1,
+            "credentials": [
+                {
+                    "fingerprintSha256": "a" * 64,
+                    "serialHex": "1",
+                    "issuerId": "issuer-sha256:" + "b" * 64,
+                    "notBefore": (now - timedelta(days=1)).isoformat(),
+                    "notAfter": (now + timedelta(days=1)).isoformat(),
+                }
+            ],
+        }
+    )
     return User(
         kind="User",
-        metadata=ObjectMeta(name="person", uid="original-user", generation=1),
-        spec=UserSpec(callsign="first"),
+        metadata=ObjectMeta(
+            name="person",
+            uid="original-user",
+            generation=1,
+            annotations={ACCEPTED_CREDENTIALS_ANNOTATION: credentials},
+        ),
+        spec=UserSpec(callsign="first", approvedAt=now - timedelta(hours=1)),
     )
 
 
@@ -50,8 +72,19 @@ class FixtureProjector:
         self.receipt: ProjectionReceipt | None = None
         self.failure = False
         self.mutate: User | None = None
+        self.seen_credentials: list[tuple[PublicCredential, ...]] = []
 
-    def reconcile(self, user: User, groups: list[Group], roles: list[Role], revision: str) -> ProjectionReceipt:
+    def reconcile(
+        self,
+        user: User,
+        groups: list[Group],
+        roles: list[Role],
+        credentials: tuple[PublicCredential, ...],
+        revision: str,
+    ) -> ProjectionReceipt:
+        self.seen_credentials.append(credentials)
+        if credentials:
+            assert len(credentials) == 1 and credentials[0].fingerprint_sha256 == "a" * 64
         if self.failure:
             raise RuntimeError("fixture partial write")
         if self.mutate is not None:
@@ -111,7 +144,7 @@ def test_full_readback_and_refresh() -> None:
     assert condition(worker.reconcile(user, [], [])).status == "False"
 
 
-@pytest.mark.parametrize("change", ["input", "api", "messaging", "expiry", "naive", "empty"])
+@pytest.mark.parametrize("change", ["input", "api", "messaging", "expiry", "naive", "empty", "beyond-credential"])
 def test_unverified_receipts_never_mark_ready(change: str) -> None:
     projector = FixtureProjector()
     worker, _, user = reconciler(projector)
@@ -125,6 +158,7 @@ def test_unverified_receipts_never_mark_ready(change: str) -> None:
         "expiry": replace(receipt, valid_until=datetime.now(UTC)),
         "naive": replace(receipt, valid_until=datetime.now()),
         "empty": replace(receipt, desired_revision=""),
+        "beyond-credential": replace(receipt, valid_until=datetime.now(UTC) + timedelta(days=2)),
     }
     projector.receipt = updates[change]
     assert condition(worker.reconcile(user, [], [])).reason == "ProjectionUnverified"
@@ -224,6 +258,12 @@ def test_input_revisions_ignore_binding_feedback_and_track_references() -> None:
         ],
     )
     assert input_revision(user, [], []) == original
+    assert user.metadata is not None and user.metadata.annotations is not None
+    user.metadata.annotations[ACCEPTED_CREDENTIALS_ANNOTATION] = user.metadata.annotations[
+        ACCEPTED_CREDENTIALS_ANNOTATION
+    ].replace('"serialHex": "1"', '"serialHex": "2"')
+    assert input_revision(user, [], []) != original
+    original = input_revision(user, [], [])
     user.status.public_key = "changed"
     assert input_revision(user, [], []) != original
     group = Group(
@@ -278,3 +318,36 @@ def test_missing_resource_identity() -> None:
         binding_name(user)
     with pytest.raises(ValueError):
         input_revision(user, [], [])
+
+
+@pytest.mark.parametrize("raw", [None, "", "{}", '{"version":1,"credentials":[]}', "not-json"])
+def test_missing_or_malformed_credential_metadata_keeps_binding_unready(raw: str | None) -> None:
+    projector = FixtureProjector()
+    worker, _, user = reconciler(projector)
+    assert user.metadata is not None
+    user.metadata.annotations = {ACCEPTED_CREDENTIALS_ANNOTATION: raw} if raw is not None else {}
+    assert condition(worker.reconcile(user, [], [])).reason == "CredentialsUnavailable"
+    assert projector.seen_credentials == [()]
+
+
+def test_removed_credentials_reach_projector_before_binding_stays_unready() -> None:
+    projector = FixtureProjector()
+    worker, _, user = reconciler(projector)
+    assert condition(worker.reconcile(user, [], [])).status == "True"
+    assert user.metadata is not None
+    user.metadata.annotations = {}
+    assert condition(worker.reconcile(user, [], [])).status == "False"
+    assert projector.seen_credentials[-1] == ()
+
+
+@pytest.mark.parametrize("change", ["unapproved", "revoked"])
+def test_user_approval_state_removes_credential_access(change: str) -> None:
+    projector = FixtureProjector()
+    worker, _, user = reconciler(projector)
+    assert condition(worker.reconcile(user, [], [])).status == "True"
+    if change == "unapproved":
+        user.spec.approved_at = None
+    else:
+        user.spec.revoked_at = datetime.now(UTC)
+    assert condition(worker.reconcile(user, [], [])).status == "False"
+    assert projector.seen_credentials[-1] == ()

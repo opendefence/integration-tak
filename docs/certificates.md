@@ -15,6 +15,10 @@ Use `public_credential(certificates)` to check the public record against the iss
 The record contains the leaf SHA-256, serial, issuer key ID, and validity times.
 The provisional issuer ID is `issuer-sha256:` followed by the SHA-256 of the issuing CA subject DER and public key DER.
 Core must publish the accepted record; an integration must not treat issuance alone as approval.
+The provisional User annotation key is `platform.opendefence.fi/accepted-credentials`.
+Use `accepted_credential_records(raw, now=verification_time)` to read its version 1 JSON value.
+The parser rejects empty, duplicate, malformed, and unsupported records.
+It removes expired and not-yet-valid records from the returned set.
 The export has alias `client`.
 It uses PBESv2 SHA-256/AES-256, a SHA-256 MAC, and 600,000 KDF rounds.
 Passwords must contain 6 to 128 printable ASCII characters.

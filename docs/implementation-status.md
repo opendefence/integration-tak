@@ -297,6 +297,11 @@ Delivery compares the approved public record with the exported leaf's SHA-256, s
 The provisional issuer ID is `issuer-sha256:` plus the SHA-256 of the issuing CA subject DER and public key DER.
 The selected User annotation key, IntegrationManifest schema, and integration SAN profile remain open.
 The current local administrator bootstrap does not use an IntegrationManifest.
+The operator provisionally reads `platform.opendefence.fi/accepted-credentials` as a version 1 JSON set.
+It includes that annotation in the input revision and passes current public records to the projector.
+Missing or malformed metadata keeps UserBinding readiness false. The production projector remains unavailable.
+The operator passes an empty set when metadata is invalid or the User is unapproved or revoked.
+No live TAK deprovisioning is claimed.
 
 ## Next action
 

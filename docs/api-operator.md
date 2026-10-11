@@ -143,6 +143,10 @@ They do not define Core HTTP paths, identity headers, credential resources, or s
 See [Core contracts](core-contracts.md) and [server changes](tak-server-change-handoff.md).
 The package exporter now checks the User UUID in the leaf URI SAN.
 Delivery compares Core's selected public credential record with the certificate used for export.
+The operator reads the provisional accepted-credential User annotation and includes it in its input revision.
+It passes only current, valid public records to a projector. Missing or malformed metadata leaves the UserBinding unready.
+It passes an empty set when metadata is invalid or the User is unapproved or revoked, so a strict projector can remove old access.
+It rejects a projection receipt that stays valid beyond the earliest accepted certificate expiry.
 The current TAK server still needs a compatible account mapping and strict fingerprint enforcement.
 
 Implement these inputs when their versioned contracts are available:

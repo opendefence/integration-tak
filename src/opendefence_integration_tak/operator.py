@@ -15,6 +15,11 @@ from cloudcoil.errors import APIError, ResourceConflict, ResourceNotFound
 import httpx
 
 from opendefence_integration_tak.cluster import cluster_config
+from opendefence_integration_tak.certificates import (
+    ACCEPTED_CREDENTIALS_ANNOTATION,
+    PublicCredential,
+    accepted_credential_records,
+)
 from opendefence_integration_tak.tak_jni import TakJvmRuntime
 
 from lib_opendefence_core.models.v1alpha1 import (
@@ -60,9 +65,17 @@ class ProjectionReceipt:
 
 
 class Projector(Protocol):
-    def reconcile(self, user: User, groups: list[Group], roles: list[Role], revision: str) -> ProjectionReceipt:
+    def reconcile(
+        self,
+        user: User,
+        groups: list[Group],
+        roles: list[Role],
+        credentials: tuple[PublicCredential, ...],
+        revision: str,
+    ) -> ProjectionReceipt:
         """Apply the full approved set and permissions; read back uncertain writes.
 
+        An empty credential set removes previously applied certificate access.
         Implementations own one JVM in this process and return Python values only.
         A receipt requires verified messaging AND API enforcement. Never synthesize
         it from file-auth or scalar registerCert results.
@@ -71,7 +84,14 @@ class Projector(Protocol):
 
 
 class UnavailableProjector:
-    def reconcile(self, user: User, groups: list[Group], roles: list[Role], revision: str) -> ProjectionReceipt:
+    def reconcile(
+        self,
+        user: User,
+        groups: list[Group],
+        roles: list[Role],
+        credentials: tuple[PublicCredential, ...],
+        revision: str,
+    ) -> ProjectionReceipt:
         raise ProjectionUnavailable
 
 
@@ -89,6 +109,9 @@ def input_revision(user: User, groups: list[Group], roles: list[Role]) -> str:
         }
 
     user_value = identity(user)
+    user_value["acceptedCredentials"] = (
+        (user.metadata.annotations or {}).get(ACCEPTED_CREDENTIALS_ANNOTATION) if user.metadata else None
+    )
     empty_status: dict[str, object] = {}
     user_value["status"] = (
         user.status.model_dump(mode="json", by_alias=True, exclude={"bindings", "conditions", "observed_generation"})
@@ -107,6 +130,19 @@ def binding_name(user: User) -> str:
     if user.metadata is None or not user.metadata.uid:
         raise ValueError("Core User UID is missing")
     return "tak-" + hashlib.sha256(user.metadata.uid.encode()).hexdigest()[:32]
+
+
+def accepted_user_credentials(user: User, now: datetime) -> tuple[PublicCredential, ...]:
+    approved_at = user.spec.approved_at
+    if approved_at is None or approved_at.tzinfo is None or approved_at > now or user.spec.revoked_at is not None:
+        return ()
+    try:
+        return accepted_credential_records(
+            (user.metadata.annotations or {}).get(ACCEPTED_CREDENTIALS_ANNOTATION) if user.metadata else None,
+            now=now,
+        )
+    except ValueError:
+        return ()
 
 
 def set_condition(binding: UserBinding, synced: bool, reason: str, now: datetime) -> bool:
@@ -203,15 +239,25 @@ class BindingReconciler:
                 raise ValueError("Binding metadata is missing")
             binding.metadata.annotations = annotations | {_REVISION: revision, _USER_UID: user.metadata.uid or ""}
             binding = self.bindings.update(binding)
+        credentials = accepted_user_credentials(user, datetime.now(UTC))
+        invalid_credentials = not credentials
         try:
-            receipt = self.projector.reconcile(user, groups, roles, revision)
+            receipt = self.projector.reconcile(user, groups, roles, credentials, revision)
         except ProjectionUnavailable:
-            return self._status(binding, False, "AuthorityUnavailable")
+            return self._status(
+                binding, False, "CredentialsUnavailable" if invalid_credentials else "AuthorityUnavailable"
+            )
         except Exception:
             self._status(binding, False, "ProjectionFailed")
             raise
-        if not receipt.current(revision, datetime.now(UTC)):
-            return self._status(binding, False, "ProjectionUnverified")
+        if (
+            invalid_credentials
+            or not receipt.current(revision, datetime.now(UTC))
+            or receipt.valid_until > min(record.not_after for record in credentials)
+        ):
+            return self._status(
+                binding, False, "CredentialsUnavailable" if invalid_credentials else "ProjectionUnverified"
+            )
         if user.name is None:
             raise ValueError("Core User name is missing")
         try:
