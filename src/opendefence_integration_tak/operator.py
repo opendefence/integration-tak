@@ -132,6 +132,7 @@ def input_revision(user: User) -> str:
     user_value: dict[str, object] = {
         "name": user.name,
         "uid": user.metadata.uid,
+        "generation": user.metadata.generation,
         "deletingAt": user.metadata.deletion_timestamp.model_dump(mode="json")
         if user.metadata.deletion_timestamp
         else None,
@@ -142,7 +143,7 @@ def input_revision(user: User) -> str:
     )
     empty_status: dict[str, object] = {}
     user_value["status"] = (
-        user.status.model_dump(mode="json", by_alias=True, exclude={"bindings", "conditions", "observed_generation"})
+        user.status.model_dump(mode="json", by_alias=True, exclude={"bindings", "conditions"})
         if user.status
         else empty_status
     )

@@ -128,6 +128,7 @@ Kubernetes garbage collection owns removal of the old binding.
 The tak-operator preserves foreign bindings and unrelated status conditions.
 It clears `Synced` before publishing changed input revisions.
 Input revisions cover User identity, spec, accepted certificates, and projected status.
+They include the User generation and the generation observed by the core-operator.
 User binding observations are excluded to prevent feedback loops.
 The tak-operator reads roles and groups from `User.status` only.
 The accepted certificates identify connections to that User.

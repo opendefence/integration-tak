@@ -289,6 +289,27 @@ def test_user_changes_during_projection() -> None:
     assert condition(worker.reconcile(user)).reason == "InputsChanged"
 
 
+@pytest.mark.parametrize("change", ["generation", "observed-generation"])
+def test_user_projection_becomes_stale_during_readback(monkeypatch: pytest.MonkeyPatch, change: str) -> None:
+    worker, fixture, user = reconciler(FixtureProjector())
+    handle = fixture._handle
+
+    def stale(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/users/person"):
+            stored = fixture.objects[request.url.path]
+            assert isinstance(stored, User) and stored.metadata is not None and stored.status is not None
+            if change == "generation":
+                stored.metadata.generation = 2
+            else:
+                stored.status.observed_generation = None
+        return handle(request)
+
+    monkeypatch.setattr(fixture, "_handle", stale)
+    binding = worker.reconcile(user)
+    assert condition(binding).status == "False"
+    assert condition(binding).reason == "InputsChanged"
+
+
 def test_receipt_expires_during_core_readback(monkeypatch: pytest.MonkeyPatch) -> None:
     projector = FixtureProjector()
     worker, fixture, user = reconciler(projector)
@@ -351,7 +372,7 @@ def test_input_revisions_ignore_binding_feedback_and_track_user_projection() -> 
     user.status = UserStatus(
         publicKey="current",
         bindings=[observation.model_copy(update={"synced": True})],
-        observedGeneration=2,
+        observedGeneration=1,
         conditions=[
             PlatformCondition(
                 type="BindingsSynced",
