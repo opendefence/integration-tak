@@ -49,7 +49,8 @@ The installed integration's certificate identity is trusted because an administr
 Do not require a second approval.
 Strict mode must bind the presented certificate to that installed identity before the REST API can use it.
 Other installed integrations may need port 8443 or 8089.
-Core's IntegrationManifest contract must define how status reports each integration's own mTLS certificate serial.
+Core's `Integration` CRD must define how status reports each integration's own mTLS certificate serial.
+The schema in library `0.2.2+261011` has no certificate fields yet.
 It must define identity, issuer, rotation, removal, and freshness checks.
 A serial alone is not a global certificate identity.
 Keep the private key in an integration-owned Secret and outside the delivery API Pod.

@@ -18,9 +18,10 @@ Check out `tak-server` beside this repository.
 Install Kind, Zarf, kubectl, and Docker or Podman.
 Run `task --yes up` with Task 3.53 or newer to start the local Kind cluster and registries.
 The task installs the base operators, local TAK database and identities.
+It installs the six Core CRDs from a pinned Core revision without starting the core-operator.
 The local Zarf flavor issues `tak-integration-admin` for the operator.
 It builds and loads the three images, deploys this repository's Zarf package, and checks authenticated TAK HTTPS.
-The task uses the remote Taskfiles from `opendefence/base`.
+The task uses remote Taskfiles from `opendefence/base` and `opendefence/core`.
 Task asks you to trust the remote source on first use if you omit `--yes`.
 
 Use Python 3.14 and uv.
@@ -44,7 +45,13 @@ Credential-update delivery remains disabled until client tests establish a suppo
 ## Kubernetes package
 
 Run `zarf dev lint . --flavor local-dev --set TAK_IMAGE=localhost/tak-server:local` to check the local package.
-Install the `platform.opendefence.fi/v1alpha1` Core CRDs before you test operator reconciliation.
+Run `task --yes core:crds` to install the `platform.opendefence.fi/v1alpha1` Core CRDs before a manual deployment.
+This task does not start the core-operator or change simulated User projections.
+The package registers the cluster-scoped `Integration/integration-tak` resource.
+It declares product information and intended network access.
+It declares no extra roles; the tak-operator still trusts User role and group projections.
+The Core library is pinned to `0.2.2+261011`.
+This Integration schema has no certificate or renewal fields yet.
 The local task builds and loads the images into Kind.
 Run this command to redeploy the local package after its prerequisites are ready:
 

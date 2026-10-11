@@ -13,6 +13,11 @@ vars:
 includes:
   registries: https://github.com/opendefence/base.git//taskfiles/registries.yaml?ref=main
   cluster: https://github.com/opendefence/base.git//taskfiles/cluster.yaml?ref=main
+  core:
+    taskfile: https://raw.githubusercontent.com/opendefence/core/f34aef83d5db838ad8d2f28ea2fa9af7147510e9/taskfiles/core.yaml
+    vars:
+      CORE_REF: '{{.CORE_REF | default "f34aef83d5db838ad8d2f28ea2fa9af7147510e9"}}'
+      KUBE_CONTEXT: '{{.TAK_KUBE_CONTEXT}}'
 
 tasks:
   up:
@@ -25,6 +30,8 @@ tasks:
       - env -u NODE task --yes cluster:configure-mirrors
       - task: cluster:document-local-registry
       - task: platform
+      - task: core:crds
+      - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} wait --for=condition=Established crd/integrations.platform.opendefence.fi crd/users.platform.opendefence.fi crd/userbindings.platform.opendefence.fi --timeout=60s
       - task: credentials
       - task: database
       - task: identities

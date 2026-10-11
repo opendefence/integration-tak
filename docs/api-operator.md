@@ -110,7 +110,7 @@ No private keys or ZIP bytes are stored in it.
 
 ## Binding lifecycle
 
-Typed readers use `lib-opendefence-core==0.2.1+261010` for the supplied
+Typed readers use `lib-opendefence-core==0.2.2+261011` for the supplied
 `platform.opendefence.fi/v1alpha1` User and UserBinding shapes.
 Only fields in that versioned model are interpreted as projection inputs; the models
 do not turn Core status into an effective permission grant.

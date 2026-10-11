@@ -46,7 +46,7 @@ The package bundles the TAK image. Local Kind uses loaded images for connected d
 Production needs reachable API and operator images and explicit deploy variables.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. The tak-operator uses
-`lib-opendefence-core==0.2.1+261010` models from the user-supplied Nexus index.
+`lib-opendefence-core==0.2.2+261011` models from the user-supplied Nexus index.
 Production authorization and credential adapters still need semantic contracts.
 The release-92 operator image also passed a native JNI check, a Kind binding lifecycle check, and live administrator registration.
 The integration is not release-ready.
@@ -311,8 +311,8 @@ The package exporter now checks the canonical User UUID URI SAN instead of treat
 Its test certificates use a display CN with a stable short tag. Callsign remains separate.
 Delivery compares the approved public record with the exported leaf's SHA-256, serial, issuing CA key ID, and validity.
 The provisional issuer ID is `issuer-sha256:` plus the SHA-256 of the issuing CA subject DER and public key DER.
-The selected User annotation key, IntegrationManifest schema, and integration SAN profile remain open.
-The current local administrator bootstrap does not use an IntegrationManifest.
+The selected User annotation key, integration certificate schema, and integration SAN profile remain open.
+The current local administrator bootstrap does not use an Integration credential inventory.
 The operator provisionally reads `platform.opendefence.fi/accepted-credentials` as a version 1 JSON set.
 It includes that annotation in the input revision and passes current public records to the projector.
 Missing or malformed metadata keeps UserBinding readiness false.

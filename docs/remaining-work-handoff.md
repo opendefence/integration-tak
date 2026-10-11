@@ -9,7 +9,7 @@ Initial binary probe checkpoint: `67b94e2`. Later probe evidence is in [the curr
 The foundation and pure full-setup package builder are implemented.
 The seven REST operations, Secret-backed grants and UserBinding reconciliation are implemented.
 Production Core authorization and strict TAK JNI adapters remain unavailable.
-Core CRD resource readers now use `lib-opendefence-core==0.2.1+261010` from Nexus;
+Core CRD resource readers now use `lib-opendefence-core==0.2.2+261011` from Nexus;
 the installed CRD and existing User callsigns must satisfy its narrower callsign pattern.
 See [API and operator](api-operator.md) for behavior and adapter contracts.
 I1 is incomplete. I2 is partial. The integration is not release-ready.
@@ -170,7 +170,7 @@ Obtain versioned contracts or shared conformance implementations for these bound
 | Identity | Persistent immutable User UUID source, canonical `urn:uuid:<uuid>` URI SAN, display CN, restore behavior, and initial CSR flow. |
 | Effective permissions | Group ancestry, role union, revisions, freshness, and changes caused by group moves or role edits. |
 | Credential inventory | Core-owned User annotation with approved generations, purpose, issuer/serial, SHA-256 fingerprint, validity, predecessor mapping, and superseded/compromised states. The integration provisionally reads `platform.opendefence.fi/accepted-credentials`; Core must confirm the key and schema. |
-| Installed integration identity | Define one IntegrationManifest per instance with its own identity, named credentials, connection purposes, public credential status, and destination acknowledgements. Do not use a service User or UserBinding. Define the SAN, trust, rotation, removal, readiness, and freshness rules. Zarf installation is authorization; there is no second approval. TAK must apply the current inventory for 8443 and 8089. |
+| Installed integration identity | The cluster-scoped `Integration` CRD now exists. The TAK package registers `integration-tak`. This schema does not yet include certificate identities, named credentials, connection purposes, or destination acknowledgements. Define those fields and the SAN, trust, rotation, removal, readiness, and freshness rules. Do not use a service User or UserBinding. Zarf installation is authorization; there is no second approval. TAK must apply the current inventory for 8443 and 8089. |
 | Issuance and export | Permission to reuse a main key, TAK-only issuance for client-held main keys, renewal approval, and restart recovery. |
 | Kubernetes ownership | Credential namespaces, permitted Secret readers, retention, applied revisions, and current readiness. UserBinding scope and integration writers are supplied. |
 | HTTP authority | Verified mTLS identity, trusted headers, spoofed-header removal, authorization deadlines, and direct-service access controls. |

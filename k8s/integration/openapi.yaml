@@ -1,0 +1,8 @@
+# Tell Kustomize that Integration has no namespace.
+paths:
+  /apis/platform.opendefence.fi/v1alpha1/integrations/{name}:
+    get:
+      x-kubernetes-group-version-kind:
+        group: platform.opendefence.fi
+        version: v1alpha1
+        kind: Integration

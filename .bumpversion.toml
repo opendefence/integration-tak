@@ -14,3 +14,8 @@ replace = 'version = "{new_version}"'
 filename = "src/opendefence_integration_tak/__init__.py"
 search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "k8s/integration/integration.yaml"
+search = 'version: "{current_version}"'
+replace = 'version: "{new_version}"'
