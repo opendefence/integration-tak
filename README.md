@@ -9,7 +9,8 @@ The OpenDefence stack Kustomization at `k8s/stack` composes these workloads with
 the sibling `../tak-server/k8s/overlays/integrated` and creates the TAK Server Pod resources.
 See `docs/implementation-status.md` for stage gates and blockers.
 See [remaining work handoff](docs/remaining-work-handoff.md) to continue implementation, including possible binary-probe safety blocks.
-See [server change handoff](docs/tak-server-change-handoff.md) for server packaging, strict authentication, and release acceptance work.
+The `tak-operator` owns integrated strict authentication. See the [remaining work list](docs/remaining-work-handoff.md#integrated-strict-authentication-ownership).
+Use the [TAK image handoff](docs/tak-server-change-handoff.md) for gaps that require image changes.
 See [package construction](docs/packages.md) and [PKCS#12 export](docs/certificates.md) for the available Python functions.
 
 ## Development

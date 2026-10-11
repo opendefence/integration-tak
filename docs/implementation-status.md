@@ -2,6 +2,10 @@
 
 ## Stage and model
 
+The `tak-operator` owns integrated strict authentication under the user's 2026-10-11 decision.
+The [remaining work handoff](remaining-work-handoff.md#integrated-strict-authentication-ownership) is the authoritative work list.
+Only changes that require a different TAK image belong in the [server handoff](tak-server-change-handoff.md).
+
 I0 is code-complete and locally verified on ARM64.
 I1 is incomplete. The 5.8.84 component probe proves an approved-set failure.
 The current sibling candidate is TAK 5.8.92. Its strict admission agent checks test traffic.
@@ -418,8 +422,9 @@ Obtain the missing redesign file and final server base contract.
 Keep credential-update delivery disabled until real client tests establish a supported method.
 Keep production readiness blocked on current authority and full approved-set enforcement.
 The strict approved-fingerprint design is adopted. Do not ask for that approval again.
-Use the current server plan for external injection of the tested policy into authentication and management.
-Version the extension configuration and management capability with the pinned, unchanged vendor artifacts.
+Own the strict writer, readback, freshness, session handling, observation, and live acceptance here.
+Use existing TAK interfaces first. Send reproduced image gaps to `tak-server` through the image handoff.
+The server owns shipped extension code and its compatibility with unchanged vendor artifacts.
 Prove projection delivery to messaging and API before claiming readiness.
 Live-test the adopted server mechanism before completing I1.
 Do not mark I1 complete or weaken its approved-fingerprint requirement.

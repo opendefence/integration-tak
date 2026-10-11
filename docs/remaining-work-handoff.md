@@ -1,6 +1,6 @@
 # Integration TAK remaining work handoff
 
-Date: 2026-10-10.
+Date: 2026-10-11.
 Recipient: the next implementation agent or engineer.
 Repository: `opendefence/integration-tak`.
 Branch: `feat/i0-foundation`.
@@ -42,9 +42,39 @@ The Core working handoff is at `/Users/rambo/Downloads/rasenmaeher-core-architec
 The user supplied [Core CRDs](../../opendefence_core_crds.yaml) for `platform.opendefence.fi/v1alpha1`.
 See [Core contracts](core-contracts.md) for the snapshot hash, settled resource ownership, and remaining semantic gaps.
 The server handoff is at `../tak-server/tak-server-implementation-handoff.md`.
-Use the [consolidated server change handoff](tak-server-change-handoff.md) for the later single-Pod decision, adopted strict fingerprint extension, and all remaining server changes.
+Use the [TAK image change handoff](tak-server-change-handoff.md) only for changes that require a different TAK image.
 Their local paths may be unavailable on another host.
 Obtain the source files before relying on their contracts.
+
+## Integrated strict authentication ownership
+
+The user assigned integrated strict authentication to the `tak-operator` on 2026-10-11.
+This repository owns that work unless it requires changes to the TAK image.
+This section is the authoritative work list. It supersedes the broader server assignments in earlier handoffs.
+Core still owns User authority, credential approval, and predecessor revocation.
+Standalone TAK keeps legacy certificate authentication.
+
+The native projector already writes one TAK record per accepted certificate.
+It verifies native records and requests CoT session removal.
+These operations do not prove strict admission. `JniProjector` still returns no strict receipt.
+Keep `Synced=False` until fresh authority and verified enforcement agree.
+
+- [ ] Resolve the [Core contracts](core-contracts.md). Define immutable UUID, URI SAN, display CN, credential purpose and generation, issuer/serial, fingerprint, deadlines, permission revisions, and restore behavior.
+- [ ] Reconcile each User's complete accepted set. Apply the User's roles and groups to every certificate record. Serialize JNI mutations. Verify uncertain writes before retry. Remove one certificate without removing the other records or permissions.
+- [ ] Own the trusted strict-policy writer and readback adapter. Use the existing 8443 REST service and the integration's trusted administrator mTLS identity. Do not add another listener or bootstrap credential. Request an image interface only if the existing interfaces cannot perform the required operation.
+- [ ] Bind immutable readback to the requested complete set, deadline, and conditional revision in both messaging and API JVMs. Handle conflicts, partial application, limit errors, and uncertain writes. A successful JNI write alone is insufficient.
+- [ ] Own the 60-second authority lease. Renew only after confirming the complete Core projection is current. Invalidate on authority loss. Test expiry, invalidation, restart, and recovery in both JVMs. Never renew an expired nonempty projection to restore stale approvals.
+- [ ] Consume the installed `Integration` identity inventory when Core defines its missing certificate fields. Zarf installation is authorization. Match integration identity and issuer plus serial, with the exact leaf when available. Apply the required 8443 and 8089 access. Remove access on removal or credential change. Do not create a service User or a second approval step.
+- [ ] Verify the versioned image capability and active enforcement mode. Match the unchanged vendor artifacts and extension version. Resolve the current policy's exact-CN account model against Core's UUID URI SAN and native per-certificate records. Check its limits of 1,024 accounts, 32 fingerprints per account, and 256 characters per identifier. Do not encode sets in TAK's scalar fingerprint field.
+- [ ] Prove denial before the first CoT is routed and before protected HTTP access. Cover caches, tokens, enabled alternate transports, existing connections, and resumed TLS sessions. Measure the revocation bound. CoT removal after authentication cannot establish admission safety.
+- [ ] Own completed-authentication observation and recovery after reconnect or restart. Bind evidence to the exact connection, UUID, leaf fingerprint, approval revision, and time. Reject stale, unrelated, revoked, and superseded evidence. Request an image signal only if existing APIs cannot provide this proof.
+- [ ] Report activation durably to Core with idempotent events and recovery scans. Keep main and TAK-only activation independent. Downloads and manual acknowledgement are not activation. Do not require a CoT message or HTTP application transaction. Planned overlap has no default forced-cutover timer.
+- [ ] Run the coupled live acceptance on one final image, extension, JNI JAR, and deployment tuple. Include approved main and TAK-only leaves, a denied third CA-valid same-UUID leaf, single-leaf revocation, authority loss, restart, and sessions. Keep I1 and production readiness open until these checks pass.
+
+The `tak-server` repository owns its shipped Java policy, admission hooks, and binary compatibility checks.
+Keep that source there because it is part of the image.
+Use the [image handoff](tak-server-change-handoff.md) for a reproduced gap that needs image code.
+Continue integration work when existing interfaces suffice.
 
 ## Completed work and evidence
 
@@ -55,7 +85,7 @@ Obtain the source files before relying on their contracts.
 | Full setup, `0f9d9db` | ATAK, ATAK Mini, iTAK, WinTAK, and TAK Tracker ZIPs. XML escaping, stable internal filenames, and fresh outer filenames. |
 | Checkpoint, `0eb51ad` | Sanitized test logs, image digests, scope limits, and remaining dependencies. |
 | Binary component probe, `67b94e2` | Actual 5.8.84 WAR classes prove the unapproved same-UUID certificate receives the configured role and groups. |
-| Strict fingerprint policy, server commit `7f1e42c` | Independent Java policy passes 46 container assertions. It is not wired into TAK authentication yet. |
+| Strict fingerprint policy, server commit `7f1e42c` | Initial independent policy passed 46 container assertions. The current 5.8.92 image has admission hooks; trusted updates and both-JVM readback remain open. |
 | API/operator slice, `3739c08` | Seven HTTP routes, bounded Secret-backed grants, schema-based Core readers, UserBinding ownership, separate workload commands and scoped integration manifests. Production authority and strict JNI adapters remain unavailable. |
 
 The latest API/operator image passed 265 tests with no skips and 96.57% coverage with branches enabled.
@@ -143,18 +173,16 @@ The scalar fingerprint field does not establish a strict set of approved certifi
 Alternating registrations or encoding a list in that field is not an acceptable implementation.
 The user adopted the strict approved-fingerprint server extension on 2026-10-10.
 Do not request the adoption decision again. The user does not expect a fixed server build soon.
-The initial policy implementation is on server branch `feat/strict-fingerprint`, commit `7f1e42c`.
-Its separate local worktree is `../tak-server-strict-fingerprint`; the original server worktree has unrelated work.
-Read `extensions/strict-fingerprint/README.md` there before continuing.
-The policy is tested in isolation. It does not enforce authentication in the shipped server.
-See `docs/evidence/i1-strict-policy.txt` for results and limits.
+The initial policy commit `7f1e42c` was merged into the server workstream.
+Read the current [image extension contract](../../tak-server/extensions/strict-fingerprint/README.md).
+The pinned 5.8.92 image has admission hooks and local negative checks.
+It has no trusted update interface or verified readback across both JVMs.
+The integrated deployment still selects legacy authentication.
+See `docs/evidence/i1-strict-policy.txt` for the historical isolated results.
 The later server plan supersedes a matching-source prerequisite: changes use external launchers/runtime injection against unchanged pinned vendor artifacts.
 Public source at `5187abd46d827d37cfc5708805eced197a837e49` is based on 5.7.14 and is not a substitute.
-Connect the policy through versioned extension configuration, a trusted management writer, and all supported certificate authentication paths.
-Prove delivery to both messaging and API processes. Recheck cached HTTP identities and stop denied CoT before routing.
-Version the extension configuration and management capability with the unchanged vendor runtime tuple.
-The optional disconnect guard decision remains open.
-A post-authentication disconnect does not prove rejection before the first CoT message.
+Complete the integration-owned strict work list above.
+Request only required image changes through the image handoff.
 
 ## Core contracts required for I2
 
@@ -185,8 +213,8 @@ Core owns credential approval, inventory, and predecessor revocation.
 After the corresponding contracts and server decisions are available:
 
 1. Implement restart-safe credential selection and approved issuance through Core's lifecycle.
-2. Implement the TAK projection operator. Use one JVM per process, serialized mutations, and readback after uncertain writes.
-3. Reconcile the full approved credential set, roles, groups, and callsign presentation without recreating the UUID account.
+2. Complete the `tak-operator` strict projector and readback adapter. Keep one JVM per process, serialized mutations, and readback after uncertain writes.
+3. Verify the full accepted credential set, roles, groups, and callsign presentation without recreating unrelated certificate records.
 4. Implement authenticated successor observation with an explicit process owner and persistent Core reporting.
 5. Connect the seven implemented operations to production Core authority and verified TAK projection readback.
 6. Implement protected self-service routes and certificate-free token redemption with compatible TLS routing.
