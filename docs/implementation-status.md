@@ -51,7 +51,7 @@ The completed I2 application slice and remaining adapters are described in [API 
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
 - Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
-- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `6c8aa1c`; it selects TAK 5.8.92 but does not complete strict authentication.
+- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `fe13b7d`. It fixes local Zarf restart behavior. The preceding `738df0c` sets the LDAP interval to 60 seconds. Neither commit completes strict authentication.
 - Server packaging: `61a8273` adds the integrated overlay and Zarf inputs. The integrated overlay still uses legacy authentication.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives), `3739c08` (HTTP routes, grants and binding reconciliation).
 - Integration deployment commits: `a98e6a2` (server overlay), `1b9359d` (Zarf manifest package), `2b030a4` (live deployment fix).
@@ -236,9 +236,12 @@ No fixture keys, certificates, or ZIPs were saved as evidence.
 
 ## TAK 5.8.92 candidate check
 
-The sibling checkout at `6c8aa1c` selects `5.8-RELEASE-92`.
-Its local ARM64 image is `localhost/tak-server:release-92`, manifest
+The sibling checkout at `6c8aa1c` selected `5.8-RELEASE-92`.
+The operator build used `localhost/tak-server:release-92` at manifest
 `sha256:12ecb27b054b05ce612bbd5b16d84e2544bad4c3e33d78b2edf57265e9ad78d2`.
+The current local tag at `fe13b7d` has manifest
+`sha256:3a052e1e03f3dc88cf10b3fc67df2fd86260f1acd7410c201a5d6b2719555318`.
+The new image retains the same TAK 5.8.92 WAR and `UserManager.jar` hashes.
 The image supplies `UserManager.jar` with SHA-256
 `0fe547c2f4ce05d06a2e9724e0c2837eab0a0ba5be398390bb974b2385ce6f14`.
 See the [sibling release record](../../tak-server/docs/release-92-candidate.md) for its server checks.
@@ -258,6 +261,9 @@ The test left no User or UserBinding.
 The Dockerfile default still selects the published 5.8.69 server image.
 The sibling release-92 runtime image is local and unpublished, so builds must supply it with `TAKSERVER_IMAGE`.
 This check does not prove strict authentication or production projection.
+The stack, schema, and grants Kustomizations render against sibling commit `fe13b7d`.
+The stack has 21 resources and sets `LDAP_UPDATE_INTERVAL=60` and `TAK_AUTH_MODE=legacy`.
+No server resource from this render was applied to a cluster.
 
 ## Next action
 
