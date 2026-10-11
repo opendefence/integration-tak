@@ -15,6 +15,7 @@ EXPECTED_JAR_SHA256 = "329c3831d0550bef309a7c77ff29c3b398279f973bc9789e0db5c2681
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("runtime", choices=("api", "operator"))
+    parser.add_argument("--jar-sha256", default=EXPECTED_JAR_SHA256)
     arguments = parser.parse_args()
     assert sys.version_info[:2] == (3, 14), sys.version
     assert sys.prefix == "/opt/venv", sys.prefix
@@ -36,7 +37,7 @@ def main() -> None:
 
     jar = Path("/opt/tak/utils/UserManager.jar")
     checksum = hashlib.sha256(jar.read_bytes()).hexdigest()
-    assert checksum == EXPECTED_JAR_SHA256, checksum
+    assert checksum == arguments.jar_sha256, checksum
     assert not (Path(os.environ["JAVA_HOME"]) / "include/jni.h").exists()
     importlib.import_module("cloudcoil.application")
     config = importlib.import_module("jnius_config")
