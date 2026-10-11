@@ -25,15 +25,13 @@ from opendefence_integration_tak.tak_jni import TakJvmRuntime
 
 from lib_opendefence_core.models.v1alpha1 import (
     API_VERSION,
-    Group,
     ObjectRef,
-    Role,
     User,
     UserBinding,
     UserBindingSpec,
     UserBindingStatus,
 )
-from lib_opendefence_core.models.v1alpha1.common import PlatformCondition
+from lib_opendefence_core.models.v1alpha1.common import PlatformCondition, ResolvedRef
 
 _LABEL = "app.kubernetes.io/managed-by"
 _MANAGER = "opendefence-integration-tak"
@@ -67,35 +65,30 @@ class ProjectionReceipt:
 
 
 @dataclass(frozen=True, slots=True)
-class CredentialGrant:
-    credential: PublicCredential
-    tak_role: str
-
-
-@dataclass(frozen=True, slots=True)
-class CredentialProjection:
+class UserProjection:
     previous: tuple[PublicCredential, ...]
-    desired: tuple[CredentialGrant, ...]
+    credentials: tuple[PublicCredential, ...]
+    tak_role: str | None
+    groups: tuple[ResolvedRef, ...]
 
 
 class Projector(Protocol):
     def reconcile(
         self,
         user: User,
-        groups: list[Group],
-        roles: list[Role],
-        credentials: CredentialProjection,
+        projection: UserProjection,
         revision: str,
     ) -> ProjectionReceipt:
         """Apply the full approved set and permissions; read back uncertain writes.
 
         Previous credentials include expired records and are only a retry hint.
         Read TAK state because the binding may predate this annotation or a write may be partial.
-        An empty desired set removes access.
+        An empty credential set removes access.
         Implementations own one JVM in this process and return Python values only.
-        One User owns one TAK account; multiple desired credentials can access it.
-        Apply each desired grant to its exact fingerprint and issuer/serial pair.
-        Remove only credentials absent from desired before confirming readback.
+        One User owns one TAK account; multiple accepted credentials can access it.
+        Derive the account role and groups only from the User projection.
+        Bind credentials by exact fingerprint and issuer/serial pair.
+        Remove only credentials absent from the accepted set before confirming readback.
         Keep the account, role, and remaining credentials during rollover.
         A receipt requires verified messaging AND API enforcement. Never synthesize
         it from file-auth or scalar registerCert results.
@@ -107,28 +100,23 @@ class UnavailableProjector:
     def reconcile(
         self,
         user: User,
-        groups: list[Group],
-        roles: list[Role],
-        credentials: CredentialProjection,
+        projection: UserProjection,
         revision: str,
     ) -> ProjectionReceipt:
         raise ProjectionUnavailable
 
 
-def input_revision(user: User, groups: list[Group], roles: list[Role]) -> str:
-    def identity(resource: User | Group | Role) -> dict[str, object]:
-        if resource.metadata is None or not resource.metadata.uid or not resource.name:
-            raise ValueError("Core resource identity is missing")
-        return {
-            "name": resource.name,
-            "uid": resource.metadata.uid,
-            "deletingAt": resource.metadata.deletion_timestamp.model_dump(mode="json")
-            if resource.metadata.deletion_timestamp
-            else None,
-            "spec": resource.spec.model_dump(mode="json", by_alias=True),
-        }
-
-    user_value = identity(user)
+def input_revision(user: User) -> str:
+    if user.metadata is None or not user.metadata.uid or not user.name:
+        raise ValueError("Core User identity is missing")
+    user_value: dict[str, object] = {
+        "name": user.name,
+        "uid": user.metadata.uid,
+        "deletingAt": user.metadata.deletion_timestamp.model_dump(mode="json")
+        if user.metadata.deletion_timestamp
+        else None,
+        "spec": user.spec.model_dump(mode="json", by_alias=True),
+    }
     user_value["acceptedCredentials"] = (
         (user.metadata.annotations or {}).get(ACCEPTED_CREDENTIALS_ANNOTATION) if user.metadata else None
     )
@@ -138,12 +126,7 @@ def input_revision(user: User, groups: list[Group], roles: list[Role]) -> str:
         if user.status
         else empty_status
     )
-    value = {
-        "user": user_value,
-        "groups": [identity(item) for item in sorted(groups, key=lambda item: item.name or "")],
-        "roles": [identity(item) for item in sorted(roles, key=lambda item: item.name or "")],
-    }
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(user_value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def binding_name(user: User) -> str:
@@ -187,6 +170,19 @@ def projected_tak_role(user: User, now: datetime) -> str | None:
     return "ROLE_ADMIN" if any(role.name == "superadmin" for role in user.status.roles) else "ROLE_READONLY"
 
 
+def _user_projection(
+    user: User, previous: tuple[PublicCredential, ...], credentials: tuple[PublicCredential, ...], now: datetime
+) -> UserProjection:
+    try:
+        role = projected_tak_role(user, now)
+    except ProjectionUnavailable:
+        if credentials:
+            raise
+        role = None
+    groups = tuple(user.status.groups) if role is not None and user.status else ()
+    return UserProjection(previous, credentials, role, groups)
+
+
 def applied_credentials(binding: UserBinding) -> tuple[PublicCredential, ...]:
     raw = (binding.metadata.annotations or {}).get(_APPLIED_CREDENTIALS) if binding.metadata else None
     if raw is None:
@@ -223,12 +219,10 @@ class BindingReconciler:
     def __init__(
         self,
         users: APIClient[User],
-        groups: APIClient[Group],
-        roles: APIClient[Role],
         bindings: APIClient[UserBinding],
         projector: Projector,
     ) -> None:
-        self.users, self.groups, self.roles, self.bindings = users, groups, roles, bindings
+        self.users, self.bindings = users, bindings
         self.namespace, self.projector = bindings.default_namespace, projector
 
     def _binding(self, user: User) -> UserBinding:
@@ -312,8 +306,8 @@ class BindingReconciler:
             return self.bindings.update(binding)
         return binding
 
-    def reconcile(self, user: User, groups: list[Group], roles: list[Role]) -> UserBinding:
-        revision = input_revision(user, groups, roles)
+    def reconcile(self, user: User) -> UserBinding:
+        revision = input_revision(user)
         binding = self._binding(user)
         if binding.metadata is None or user.metadata is None:
             raise ValueError("Resource metadata is missing")
@@ -327,47 +321,39 @@ class BindingReconciler:
             binding = self.bindings.update(binding)
         previous_credentials = applied_credentials(binding)
         credentials = accepted_user_credentials(user, datetime.now(UTC))
-        invalid_credentials = not credentials
         try:
-            tak_role = projected_tak_role(user, datetime.now(UTC)) if credentials else None
-            grants = tuple(CredentialGrant(record, tak_role) for record in credentials if tak_role is not None)
-            receipt = self.projector.reconcile(
-                user, groups, roles, CredentialProjection(previous_credentials, grants), revision
-            )
+            projection = _user_projection(user, previous_credentials, credentials, datetime.now(UTC))
+            receipt = self.projector.reconcile(user, projection, revision)
         except ProjectionUnavailable:
-            return self._status(
-                binding, False, "CredentialsUnavailable" if invalid_credentials else "AuthorityUnavailable"
-            )
+            return self._status(binding, False, "CredentialsUnavailable" if not credentials else "AuthorityUnavailable")
         except Exception:
             self._status(binding, False, "ProjectionFailed")
             raise
         if not receipt.current(revision, datetime.now(UTC)) or (
-            credentials and receipt.valid_until > min(record.not_after for record in credentials)
+            projection.credentials and receipt.valid_until > min(record.not_after for record in projection.credentials)
         ):
             return self._status(binding, False, "ProjectionUnverified")
-        if invalid_credentials:
+        if not projection.credentials:
             return self._status(self._record_applied(binding, receipt, ()), False, "CredentialsUnavailable")
         if user.name is None:
             raise ValueError("Core User name is missing")
         try:
             fresh_user = self.users.get(user.name)
-            fresh_groups, fresh_roles = list(self.groups.list()), list(self.roles.list())
         except APIError, httpx.RequestError:
             self._status(binding, False, "AuthorityUnavailable")
             raise
-        if input_revision(fresh_user, fresh_groups, fresh_roles) != revision:
+        if input_revision(fresh_user) != revision:
             return self._status(binding, False, "InputsChanged")
-        binding = self._record_applied(binding, receipt, credentials)
+        binding = self._record_applied(binding, receipt, projection.credentials)
         if not receipt.current(revision, datetime.now(UTC)):
             return self._status(binding, False, "ProjectionUnverified")
         return self._status(binding, True, "ProjectionVerified")
 
     def run_once(self) -> None:
         users = list(self.users.list())
-        groups, roles = list(self.groups.list()), list(self.roles.list())
         for user in users:
             try:
-                self.reconcile(user, groups, roles)
+                self.reconcile(user)
             except ResourceConflict:
                 _LOGGER.warning("Binding conflict; retry on next scan")
             except ValueError:
@@ -385,8 +371,6 @@ def run_operator(namespace: str) -> None:
         with cluster_config(namespace=namespace) as config:
             reconciler = BindingReconciler(
                 User.client(config),
-                Group.client(config),
-                Role.client(config),
                 UserBinding.client(config, namespace=namespace),
                 UnavailableProjector(),
             )

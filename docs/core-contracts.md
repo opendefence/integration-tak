@@ -1,14 +1,14 @@
 # Core integration contract decisions
 
 The supplied Core CRDs establish the resource shapes and UserBinding ownership.
-The operator now imports its Core resource models from `lib-opendefence-core==0.2.1+261010`,
+The tak-operator now imports its Core resource models from `lib-opendefence-core==0.2.1+261010`,
 resolved from the user-supplied Nexus `pypilocal` index and pinned by hash in `uv.lock`.
 The package requires Cloudcoil 0.8, now resolved from PyPI.
 Its `UserSpec.callsign` requires `^[a-z0-9]{3,30}$`, while the supplied CRD
 snapshot only requires a nonempty string. An existing User with a callsign
-outside the package pattern fails model validation during the operator scan.
+outside the package pattern fails model validation during the tak-operator scan.
 Check the installed CRD and existing User values against this package before deployment;
-the operator does not rewrite Core-owned callsigns.
+the tak-operator does not rewrite Core-owned callsigns.
 They unblock schema-based resource readers and binding lifecycle design.
 Production authorization, credential selection, and activation still need the contracts listed below.
 Do not treat every Core boundary as missing, or infer credential approval from user approval alone.
@@ -39,13 +39,17 @@ The tak-operator uses the projected roles and does not calculate roles from `spe
 It treats `user` as implied for each approved User.
 It maps `superadmin` to TAK `ROLE_ADMIN`.
 It maps other approved Users to TAK `ROLE_READONLY`.
-The requested projection binds the TAK role to accepted certificate fingerprints and issuer plus serial values.
 One User identity owns one TAK account and one UserBinding.
 Several accepted certificates can connect to that account during rollover.
+The tak-operator requests the account role and groups from `User.status.roles` and `User.status.groups`.
+The accepted certificate set identifies connections to that account.
+Each certificate is identified by fingerprint and issuer plus serial.
+Certificates do not grant a role or group membership.
 The core-operator refuses deletion after `spec.approvedAt` is set.
 Revoke an approved User with `spec.revokedAt`.
 Keep the revoked User as a permanent revocation record.
 The tak-operator requests removal of all accepted credentials for that User.
+It also removes the User's TAK role and groups.
 It keeps the UserBinding while the revoked User remains.
 A native projector must remove only a certificate that leaves the accepted set.
 It must keep the account, its role, and the other accepted certificates.
@@ -93,7 +97,8 @@ Do not copy prototype runtime assumptions into the production implementation.
 
 ## Next integration slice
 
-Use the shared package for readers of User, Group, Role, and namespaced UserBinding resources.
+Use the shared package for readers of User and namespaced UserBinding resources.
+Read projected roles and groups from User status.
 Preserve the distinction between direct references, resolved references, and effective permissions.
 Keep Invite redemption in Core and use integration-specific RBAC.
 Test optional or missing status and replacement of a referenced object with a new UID.

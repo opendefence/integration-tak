@@ -111,23 +111,26 @@ No private keys or ZIP bytes are stored in it.
 ## Binding lifecycle
 
 Typed readers use `lib-opendefence-core==0.2.1+261010` for the supplied
-`platform.opendefence.fi/v1alpha1` User, Group, Role and UserBinding shapes.
+`platform.opendefence.fi/v1alpha1` User and UserBinding shapes.
 Only fields in that versioned model are interpreted as projection inputs; the models
 do not turn Core status into an effective permission grant.
 The package narrows callsigns beyond the supplied CRD snapshot; validate installed
 Core CRDs and existing User objects against the pinned package before deploying.
-The operator scans every ten seconds, with serial reconciliation and no fork.
+The tak-operator scans every ten seconds, with serial reconciliation and no fork.
 One User incarnation gets one deterministic binding name derived from its Kubernetes UID.
 The namespaced binding refers to `spec.userRef.name` and has a cluster-scoped User owner reference.
 Recreating a User with the same name produces a different binding.
 Kubernetes garbage collection owns removal of the old binding.
 
-The operator preserves foreign bindings and unrelated status conditions.
+The tak-operator preserves foreign bindings and unrelated status conditions.
 It clears `Synced` before publishing changed input revisions.
-Input revisions cover User identity/spec and relevant status, plus Group and Role identities/specs.
+Input revisions cover User identity, spec, accepted certificates, and projected status.
 User binding observations are excluded to prevent feedback loops.
+The tak-operator reads roles and groups from `User.status` only.
+The accepted certificates identify connections to that User.
+Certificates do not grant TAK roles or group membership.
 Projection failure, stale readback, authority failure, or a concurrent Core edit prevents `Synced=True`.
-The operator re-reads Core resources before publishing a successful status.
+The tak-operator re-reads the User CR before publishing a successful status.
 
 Integration-owned annotations record User UID, input revision, applied revision, public applied credentials, and receipt deadline.
 They use the `integration.opendefence.fi` prefix.
