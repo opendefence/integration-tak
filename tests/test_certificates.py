@@ -2,10 +2,12 @@
 
 from dataclasses import replace
 from datetime import timedelta
+import hashlib
 import os
 from pathlib import Path
 import subprocess  # nosec B404 - Runs keytool for fixture compatibility checks.
-from typing import TypedDict
+from typing import TypedDict, cast
+from uuid import UUID
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -19,12 +21,13 @@ from opendefence_integration_tak.certificates import (
     MAX_PEM_BYTES,
     ca_truststore,
     client_keystore,
+    public_credential,
 )
 from tests.conftest import CredentialFixture
 
 
 class CredentialChanges(TypedDict, total=False):
-    expected_cn: str
+    expected_user_id: UUID
     password: str
     private_key_pem: bytes
     certificate_chain_pem: bytes
@@ -55,11 +58,32 @@ def test_pkcs12_preserves_key_leaf_chain_and_unique_trust(material: CredentialFi
     assert "PRIVATE KEY" not in repr(material.credential)
 
 
+def test_public_record_uses_leaf_and_issuing_key(material: CredentialFixture) -> None:
+    record = public_credential([material.leaf, material.intermediate, material.root])
+    issuer_key = material.intermediate.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    assert record.fingerprint_sha256 == material.leaf.fingerprint(hashes.SHA256()).hex()
+    assert record.serial_hex == format(material.leaf.serial_number, "x")
+    assert (
+        record.issuer_id
+        == "issuer-sha256:" + hashlib.sha256(material.intermediate.subject.public_bytes() + issuer_key).hexdigest()
+    )
+    assert (record.not_before, record.not_after) == (
+        material.leaf.not_valid_before_utc,
+        material.leaf.not_valid_after_utc,
+    )
+    with pytest.raises(ValueError, match="issuing CA"):
+        public_credential([material.leaf])
+    with pytest.raises(ValueError):
+        public_credential([material.leaf, material.root])
+
+
 @pytest.mark.parametrize(
     "change, message",
     [
-        ({"expected_cn": "different-user"}, "expected CN"),
-        ({"expected_cn": ""}, "expected CN"),
+        ({"expected_user_id": UUID(int=2)}, "User URI SAN"),
+        ({"expected_user_id": cast(UUID, "invalid")}, "User ID"),
         ({"password": "short"}, "password"),  # nosec B105 - Invalid test input. # pragma: allowlist secret
         ({"password": "nonascii-ä"}, "password"),  # nosec B105 - Invalid test input. # pragma: allowlist secret
         ({"password": "control\x00character"}, "password"),  # nosec B105 - Invalid test input. # pragma: allowlist secret
@@ -73,7 +97,7 @@ def test_pkcs12_preserves_key_leaf_chain_and_unique_trust(material: CredentialFi
 def test_reject_invalid_export_inputs(material: CredentialFixture, change: CredentialChanges, message: str) -> None:
     credential = replace(
         material.credential,
-        expected_cn=change.get("expected_cn", material.credential.expected_cn),
+        expected_user_id=change.get("expected_user_id", material.credential.expected_user_id),
         password=change.get("password", material.credential.password),
         private_key_pem=change.get("private_key_pem", material.credential.private_key_pem),
         certificate_chain_pem=change.get("certificate_chain_pem", material.credential.certificate_chain_pem),
@@ -114,7 +138,7 @@ def test_reject_wrong_key_chain_and_validity(material: CredentialFixture) -> Non
             replace(
                 material.credential,
                 certificate_chain_pem=material.root.public_bytes(serialization.Encoding.PEM),
-                expected_cn="fixture root",
+                expected_user_id=material.credential.expected_user_id,
             ),
             now=material.now,
         )

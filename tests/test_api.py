@@ -12,13 +12,13 @@ from uuid import UUID, uuid4
 from zipfile import ZipFile
 
 from cloudcoil.apimachinery import ObjectMeta
-from cryptography.hazmat.primitives import hashes
 from jsonschema import Draft202012Validator
 import pytest
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
 from opendefence_integration_tak.api import PREFIX, PackageAPI, create_app
+from opendefence_integration_tak.certificates import public_credential
 from opendefence_integration_tak.delivery import (
     ApprovedCredential,
     DeliveryError,
@@ -44,10 +44,10 @@ def validate_schema(value: object, schema: str) -> None:
 class FixtureAuthority:
     def __init__(self, material: CredentialFixture) -> None:
         self.now = material.now
-        self.principal = Principal(UUID(material.credential.expected_cn), "main-1", material.now + timedelta(hours=1))
+        self.principal = Principal(material.credential.expected_user_id, "main-1", material.now + timedelta(hours=1))
         credential = ApprovedCredential(
             "tak-1",
-            material.leaf.fingerprint(hashes.SHA256()).hex(),
+            public_credential([material.leaf, material.intermediate]),
             "tak-client",
             "tak-generated",
             material.leaf.not_valid_after_utc,
@@ -175,9 +175,16 @@ def test_pending_is_read_only(api: APIFixture, change: str) -> None:
     assert api.client.post(api.package_path + "/download-grants", json={}).status_code == 503
 
 
-def test_exact_inventory_and_authority_deadlines(api: APIFixture) -> None:
+@pytest.mark.parametrize("field", ["fingerprint_sha256", "serial_hex", "issuer_id"])
+def test_exact_inventory_and_authority_deadlines(api: APIFixture, field: str) -> None:
     snapshot = api.authority.snapshot
-    api.authority.snapshot = replace(snapshot, approved=(replace(snapshot.approved[0], fingerprint="0" * 64),))
+    record = snapshot.approved[0].record
+    changes = {
+        "fingerprint_sha256": replace(record, fingerprint_sha256="0" * 64),
+        "serial_hex": replace(record, serial_hex="0" * 64),
+        "issuer_id": replace(record, issuer_id="0" * 64),
+    }
+    api.authority.snapshot = replace(snapshot, approved=(replace(snapshot.approved[0], record=changes[field]),))
     assert api.client.get(api.package_path + "/content").status_code == 503
     api.authority.snapshot = replace(snapshot, authority_until=api.authority.now)
     assert api.client.get(api.package_path).status_code == 503
@@ -402,7 +409,7 @@ def test_wrong_package_identity_and_material(api: APIFixture) -> None:
     assert api.client.get(api.package_path).status_code == 503
 
 
-@pytest.mark.parametrize("change", ["trust", "host", "cn", "not-yet-valid"])
+@pytest.mark.parametrize("change", ["trust", "host", "identity", "not-yet-valid"])
 def test_unusable_inputs_never_report_ready(api: APIFixture, change: str) -> None:
     snapshot = api.authority.snapshot
     assert snapshot.material is not None
@@ -410,8 +417,8 @@ def test_unusable_inputs_never_report_ready(api: APIFixture, change: str) -> Non
         api.authority.snapshot = replace(snapshot, trust_pem=b"invalid CA material")
     elif change == "host":
         api.authority.snapshot = replace(snapshot, settings=replace(snapshot.settings, host="invalid host"))
-    elif change == "cn":
-        api.authority.snapshot = replace(snapshot, material=replace(snapshot.material, expected_cn=str(uuid4())))
+    elif change == "identity":
+        api.authority.snapshot = replace(snapshot, material=replace(snapshot.material, expected_user_id=uuid4()))
     else:
         api.authority.now -= timedelta(days=2)
     assert api.client.get(api.package_path).status_code == 503

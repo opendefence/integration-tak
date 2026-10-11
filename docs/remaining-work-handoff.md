@@ -167,10 +167,10 @@ Obtain versioned contracts or shared conformance implementations for these bound
 
 | Boundary | Required decision |
 | --- | --- |
-| Identity | Persistent immutable UUID source, public/CN encoding, normalization, restore behavior, and initial CSR flow. |
+| Identity | Persistent immutable User UUID source, canonical `urn:uuid:<uuid>` URI SAN, display CN, restore behavior, and initial CSR flow. |
 | Effective permissions | Group ancestry, role union, revisions, freshness, and changes caused by group moves or role edits. |
-| Credential inventory | Approved generations, purpose, issuer/serial, SHA-256 fingerprint, validity, predecessor mapping, and superseded/compromised states. |
-| Installed integration identity | Ask Core to document how IntegrationManifest status reports the integration's own mTLS certificate serial and binds it to the manifest identity and issuer. State the encoding, trust source, rotation, removal, readiness, and freshness rules. Zarf installation is authorization; there is no second certificate approval. TAK must apply the current installed-identity inventory for 8443 and 8089. |
+| Credential inventory | Core-owned User annotation with approved generations, purpose, issuer/serial, SHA-256 fingerprint, validity, predecessor mapping, and superseded/compromised states. Select the annotation key and schema. |
+| Installed integration identity | Define one IntegrationManifest per instance with its own identity, named credentials, connection purposes, public credential status, and destination acknowledgements. Do not use a service User or UserBinding. Define the SAN, trust, rotation, removal, readiness, and freshness rules. Zarf installation is authorization; there is no second approval. TAK must apply the current inventory for 8443 and 8089. |
 | Issuance and export | Permission to reuse a main key, TAK-only issuance for client-held main keys, renewal approval, and restart recovery. |
 | Kubernetes ownership | Credential namespaces, permitted Secret readers, retention, applied revisions, and current readiness. UserBinding scope and integration writers are supplied. |
 | HTTP authority | Verified mTLS identity, trusted headers, spoofed-header removal, authorization deadlines, and direct-service access controls. |

@@ -2,13 +2,19 @@
 
 `opendefence_integration_tak.certificates` exports existing material.
 It does not generate keys, issue certificates, or approve access.
-The authoritative adapter must supply the expected certificate CN and an explicit verification time.
+The authoritative adapter must supply the expected User UUID and an explicit verification time.
+The exporter matches this UUID to one canonical `urn:uuid:<uuid>` URI SAN in the leaf.
+It does not use the display CN as an identity key.
 The exporter requires a matching RSA or EC private key and a currently valid leaf.
 It checks the supplied leaf-first chain's issuer signatures and CA basic constraints.
 These checks do not replace Core approval or full TLS certificate validation.
 
-Use `ClientCredential` for the already-issued PEM chain, unencrypted PEM key, export password, and expected CN.
+Use `ClientCredential` for the already-issued PEM chain, unencrypted PEM key, export password, and expected User UUID.
 Use `client_keystore(credential, now=verification_time)` to export one keypair.
+Use `public_credential(certificates)` to check the public record against the issued leaf and its issuing CA.
+The record contains the leaf SHA-256, serial, issuer key ID, and validity times.
+The provisional issuer ID is `issuer-sha256:` followed by the SHA-256 of the issuing CA subject DER and public key DER.
+Core must publish the accepted record; an integration must not treat issuance alone as approval.
 The export has alias `client`.
 It uses PBESv2 SHA-256/AES-256, a SHA-256 MAC, and 600,000 KDF rounds.
 Passwords must contain 6 to 128 printable ASCII characters.

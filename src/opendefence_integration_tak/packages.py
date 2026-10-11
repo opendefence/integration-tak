@@ -1,7 +1,6 @@
 """Build essential full-setup packages without provisioning or filesystem access."""
 
 from dataclasses import dataclass, field
-import base64
 from datetime import datetime
 from io import BytesIO
 import ipaddress
@@ -113,16 +112,7 @@ def build_package(
     if profile_id not in PROFILE_IDS:
         raise ValueError("Unknown package profile")
     validate_settings(settings)
-    # Accept the draft's UUID forms without choosing Core's persistence or CN encoding.
-    try:
-        credential_id = UUID(credential.expected_cn)
-    except ValueError:
-        if re.fullmatch(r"[A-Za-z0-9_-]{22}", credential.expected_cn) is None:
-            raise ValueError("Expected certificate CN must encode a UUID") from None
-        credential_id = UUID(bytes=base64.urlsafe_b64decode(credential.expected_cn + "=="))
-        if base64.urlsafe_b64encode(credential_id.bytes).decode("ascii").rstrip("=") != credential.expected_cn:
-            raise ValueError("Expected certificate CN has a noncanonical compact encoding")
-    if credential_id != settings.user_id:
+    if credential.expected_user_id != settings.user_id:
         raise ValueError("Client credential belongs to a different User UUID")
     scope = f"{settings.deployment_id}_{settings.user_id.hex}_{profile_id}"
     files = {

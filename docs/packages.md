@@ -15,10 +15,10 @@ Callsigns may contain 1 to 128 valid XML characters without controls.
 The XML library escapes callsigns and passwords.
 Callsigns never select archive paths or certificate material.
 
-The credential's expected CN must resolve to the same UUID as `PackageSettings.user_id`.
-The renderer accepts the draft's UUID text and compact Base64URL forms.
-It does not choose Core's identity persistence or certificate encoding.
-The certificate exporter also requires an exact leaf CN match to the adapter's expected value.
+The credential's expected User UUID must equal `PackageSettings.user_id`.
+The exporter checks the canonical `urn:uuid:<uuid>` URI SAN in the leaf.
+The CN is display text and does not authorize the package.
+The renderer does not choose Core's UUID storage source.
 The adapter must bind all inputs to the authorized User and credential generation.
 
 ## Profile formats

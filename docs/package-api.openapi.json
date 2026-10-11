@@ -1651,7 +1651,7 @@
   },
   "x-credential-use-observer": "For separately issued TAK-only keypairs only, reuse the guard GroupManager/getUserByConnectionId certificate read in a trusted worker. Core handles all main-certificate confirmation itself; ignore main-certificate TAK connections for rotation confirmation. Persist rotation-generation-bound observations in protected internal status, then let Core trigger idempotent issuer revocation. Do not expose a public confirmation endpoint. Retain this observation capability if upstream TAK removes the need for the optional asynchronous disconnect workaround.",
   "x-design-status": "Proposal; not an implemented service. Scope is self-service package delivery. Core enrollment-token auth and delegated downloads require an explicit future Core policy contract, not implicit bearer access.",
-  "x-external-identity": "Normalize Core UUID ID encoding before comparing to canonical UUID CN. Callsign is presentation only. Track issuer+serial/fingerprint per credential purpose.",
+  "x-external-identity": "Normalize Core UUID ID encoding before comparing to the canonical urn:uuid:<uuid> URI SAN. The CN is display text and callsign is mutable Core metadata. Track issuer+serial/fingerprint per credential purpose.",
   "x-implementation": {
     "ciStatus": {
       "publishingRunner": "arc-runner-set; confirmed available in OpenDefence",

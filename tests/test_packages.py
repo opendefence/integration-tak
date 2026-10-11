@@ -1,7 +1,6 @@
 """Verify package formats, stable credential paths, and XML/path boundaries."""
 
 from dataclasses import replace
-import base64
 from typing import cast
 from io import BytesIO
 from pathlib import PurePosixPath
@@ -75,6 +74,9 @@ def test_rotation_and_callsign_keep_internal_paths(material: CredentialFixture) 
         .serial_number(x509.random_serial_number())
         .not_valid_before(material.leaf.not_valid_before_utc)
         .not_valid_after(material.leaf.not_valid_after_utc)
+        .add_extension(
+            x509.SubjectAlternativeName([x509.UniformResourceIdentifier(f"urn:uuid:{SETTINGS.user_id}")]), False
+        )
         .sign(key, hashes.SHA256())
     )
     credential = replace(
@@ -157,18 +159,9 @@ def test_ipv4_connection(material: CredentialFixture) -> None:
         assert b"192.0.2.1:8443:ssl" in archive.read("server.pref")
 
 
-@pytest.mark.parametrize("cn", ["not-a-uuid", "A" * 21, "A" * 21 + "B"])
-def test_reject_bad_identity_encoding(material: CredentialFixture, cn: str) -> None:
-    with pytest.raises(ValueError, match="CN"):
-        build_package(
-            "atak", SETTINGS, replace(material.credential, expected_cn=cn), material.trust_pem, now=material.now
-        )
-
-
-def test_compact_cn_and_user_isolation(material: CredentialFixture) -> None:
+def test_display_cn_and_user_isolation(material: CredentialFixture) -> None:
     key = ec.generate_private_key(ec.SECP256R1())
-    cn = base64.urlsafe_b64encode(SETTINGS.user_id.bytes).decode().rstrip("=")
-    name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, cn)])
+    name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "New display name")])
     certificate = (
         x509.CertificateBuilder()
         .subject_name(name)
@@ -177,24 +170,64 @@ def test_compact_cn_and_user_isolation(material: CredentialFixture) -> None:
         .serial_number(x509.random_serial_number())
         .not_valid_before(material.leaf.not_valid_before_utc)
         .not_valid_after(material.leaf.not_valid_after_utc)
+        .add_extension(
+            x509.SubjectAlternativeName([x509.UniformResourceIdentifier(f"urn:uuid:{SETTINGS.user_id}")]), False
+        )
         .sign(key, hashes.SHA256())
     )
     credential = replace(
         material.credential,
-        expected_cn=cn,
         certificate_chain_pem=certificate.public_bytes(serialization.Encoding.PEM),
         private_key_pem=key.private_bytes(
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
         ),
     )
     canonical = build_package("atak", SETTINGS, material.credential, material.trust_pem, now=material.now)
-    compact = build_package("atak", SETTINGS, credential, material.trust_pem, now=material.now)
-    with ZipFile(BytesIO(canonical.content)) as first, ZipFile(BytesIO(compact.content)) as second:
+    changed_display = build_package("atak", SETTINGS, credential, material.trust_pem, now=material.now)
+    with ZipFile(BytesIO(canonical.content)) as first, ZipFile(BytesIO(changed_display.content)) as second:
         assert first.namelist() == second.namelist()
     with pytest.raises(ValueError, match="different User UUID"):
         build_package(
             "atak", replace(SETTINGS, user_id=UUID(int=2)), material.credential, material.trust_pem, now=material.now
         )
+
+
+@pytest.mark.parametrize(
+    "uris",
+    [
+        (),
+        ("urn:uuid:00000000-0000-4000-8000-000000000002",),
+        ("URN:UUID:00000000-0000-4000-8000-000000000001",),
+        (
+            "urn:uuid:00000000-0000-4000-8000-000000000001",
+            "URN:UUID:00000000-0000-4000-8000-000000000002",
+        ),
+    ],
+)
+def test_reject_missing_or_wrong_user_uri_san(material: CredentialFixture, uris: tuple[str, ...]) -> None:
+    key = ec.generate_private_key(ec.SECP256R1())
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(material.leaf.subject)
+        .issuer_name(material.leaf.subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(material.leaf.not_valid_before_utc)
+        .not_valid_after(material.leaf.not_valid_after_utc)
+    )
+    if uris:
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName([x509.UniformResourceIdentifier(uri) for uri in uris]), False
+        )
+    credential = replace(
+        material.credential,
+        certificate_chain_pem=builder.sign(key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM),
+        private_key_pem=key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+        ),
+    )
+    with pytest.raises(ValueError, match="User URI SAN"):
+        build_package("atak", SETTINGS, credential, material.trust_pem, now=material.now)
 
 
 def test_reject_unparsed_user_id(material: CredentialFixture) -> None:

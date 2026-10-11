@@ -141,6 +141,9 @@ A Core outage can prevent status writes; the live authority boundary and receipt
 The Python `Authority` and `Projector` interfaces are internal testable seams.
 They do not define Core HTTP paths, identity headers, credential resources, or server wire schemas.
 See [Core contracts](core-contracts.md) and [server changes](tak-server-change-handoff.md).
+The package exporter now checks the User UUID in the leaf URI SAN.
+Delivery compares Core's selected public credential record with the certificate used for export.
+The current TAK server still needs a compatible account mapping and strict fingerprint enforcement.
 
 Implement these inputs when their versioned contracts are available:
 
@@ -152,6 +155,7 @@ Implement these inputs when their versioned contracts are available:
 
 The integration operator uses a dedicated client certificate for TAK's port 8443 REST API.
 The local Zarf flavor creates `tak-integration-admin` through cert-manager and `public-issuer`.
+The local administrator bootstrap still uses its fixed CN. The integration identity SAN profile is not defined yet.
 Supply `tak-integration-admin` in the integration namespace for a production deployment.
 Use `integration-tak-admin` as the certificate CN.
 Store `tls.crt`, `tls.key`, and `ca.crt` in the same Secret.

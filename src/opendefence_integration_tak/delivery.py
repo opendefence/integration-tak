@@ -9,10 +9,15 @@ import re
 from typing import Literal, Protocol
 from uuid import UUID
 
-from cryptography.hazmat.primitives import hashes
 from starlette.requests import Request
 
-from opendefence_integration_tak.certificates import ClientCredential, validate_ca_bundle, validate_client_credential
+from opendefence_integration_tak.certificates import (
+    ClientCredential,
+    PublicCredential,
+    public_credential,
+    validate_ca_bundle,
+    validate_client_credential,
+)
 from opendefence_integration_tak.packages import PackageSettings, validate_settings
 
 
@@ -49,7 +54,7 @@ class Principal:
 @dataclass(frozen=True, slots=True)
 class ApprovedCredential:
     id: str
-    fingerprint: str
+    record: PublicCredential
     purpose: Literal["main", "tak-client"]
     source: Literal["reused-main", "tak-generated"]
     expires_at: datetime
@@ -99,16 +104,16 @@ class PackageSnapshot:
             validate_settings(self.settings)
             _, certificates = validate_client_credential(self.material, now=now)
             validate_ca_bundle(self.trust_pem)
-            if parse_user_id(self.material.expected_cn) != self.settings.user_id:
+            if self.material.expected_user_id != self.settings.user_id:
                 raise ValueError("Credential identity mismatch")
-            leaf = certificates[0]
+            record = public_credential(certificates)
         except ValueError, DeliveryError:
             raise DeliveryError(503, "package-unavailable") from None
         if (
             selected.expires_at.tzinfo is None
             or selected.expires_at <= now
-            or selected.fingerprint != leaf.fingerprint(hashes.SHA256()).hex()
-            or selected.expires_at != leaf.not_valid_after_utc
+            or selected.record != record
+            or selected.expires_at > record.not_after
             or len({item.id for item in self.approved}) != len(self.approved)
         ):
             raise DeliveryError(503, "package-unavailable")

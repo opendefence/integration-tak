@@ -108,7 +108,7 @@ Use the shared Core models; do not copy prototype models or server deployments.
 
 The package builder accepts explicit inputs and already-issued material.
 It builds full setup for ATAK, ATAK Mini, iTAK, WinTAK, and TAK Tracker.
-It binds the expected certificate CN to the User UUID and validates key pairing.
+At this earlier checkpoint, it bound the certificate CN to the User UUID and validated key pairing.
 It uses bounded inputs, XML construction, and stable internal certificate names.
 Private keys use PBESv2 AES-256 with a SHA-256 MAC and 600,000 KDF rounds.
 Public CA truststores preserve the specified Java compatibility format.
@@ -288,6 +288,15 @@ These checks do not prove strict admission, Core authorization, or safe administ
 The local certificate is for the disposable test cluster. Production must supply an identity from a CA trusted by TAK.
 Production renewal needs a notification from Core or the issuer before the operator changes TAK's administrator fingerprint.
 The notification must bind the installed integration, issuer, new fingerprint, and Secret revision.
+
+## 2026-10-11 certificate identity assumptions
+
+The package exporter now checks the canonical User UUID URI SAN instead of treating the CN as an identity key.
+Its test certificates use a display CN with a stable short tag. Callsign remains separate.
+Delivery compares the approved public record with the exported leaf's SHA-256, serial, issuing CA key ID, and validity.
+The provisional issuer ID is `issuer-sha256:` plus the SHA-256 of the issuing CA subject DER and public key DER.
+The selected User annotation key, IntegrationManifest schema, and integration SAN profile remain open.
+The current local administrator bootstrap does not use an IntegrationManifest.
 
 ## Next action
 

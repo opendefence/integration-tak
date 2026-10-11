@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import hashlib
 import shutil
+from uuid import UUID
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -31,6 +33,8 @@ class CredentialFixture:
 @pytest.fixture(scope="session", params=("ec", "rsa"))
 def material(request: pytest.FixtureRequest) -> CredentialFixture:
     now = datetime.now(UTC)
+    user_id = UUID("00000000-0000-4000-8000-000000000001")
+    tag = hashlib.sha256(str(user_id).encode()).hexdigest()[:8]
     certificates: list[x509.Certificate] = []
     keys = [
         rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -40,11 +44,11 @@ def material(request: pytest.FixtureRequest) -> CredentialFixture:
     ]
     names = [
         x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, value)])
-        for value in ("fixture root", "fixture intermediate", "00000000-0000-4000-8000-000000000001")
+        for value in ("fixture root", "fixture intermediate", f"Fixture · {tag}")
     ]
     for index, name in enumerate(names):
         issuer_index = max(0, index - 1)
-        certificates.append(
+        builder = (
             x509.CertificateBuilder()
             .subject_name(name)
             .issuer_name(names[issuer_index])
@@ -53,8 +57,12 @@ def material(request: pytest.FixtureRequest) -> CredentialFixture:
             .not_valid_before(now - timedelta(days=1))
             .not_valid_after(now + timedelta(days=1))
             .add_extension(x509.BasicConstraints(ca=index < 2, path_length=None), critical=True)
-            .sign(keys[issuer_index], hashes.SHA256())
         )
+        if index == 2:
+            builder = builder.add_extension(
+                x509.SubjectAlternativeName([x509.UniformResourceIdentifier(f"urn:uuid:{user_id}")]), critical=False
+            )
+        certificates.append(builder.sign(keys[issuer_index], hashes.SHA256()))
     credential = ClientCredential(
         certificate_chain_pem=b"".join(
             cert.public_bytes(serialization.Encoding.PEM) for cert in reversed(certificates)
@@ -63,7 +71,7 @@ def material(request: pytest.FixtureRequest) -> CredentialFixture:
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
         ),
         password="fixture-only-password",  # nosec B106 - Test fixture. # pragma: allowlist secret
-        expected_cn="00000000-0000-4000-8000-000000000001",
+        expected_user_id=user_id,
     )
     return CredentialFixture(credential, certificates[0], certificates[1], certificates[2], now)
 

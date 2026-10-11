@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import hashlib
+from uuid import UUID
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.x509.oid import NameOID
 
 MAX_PEM_BYTES = 1024 * 1024
 MAX_CERTIFICATES = 32
@@ -18,12 +19,23 @@ TRUSTSTORE_PASSWORD = "public"  # nosec B105  # pragma: allowlist secret
 
 @dataclass(frozen=True, slots=True)
 class ClientCredential:
-    """Already-issued material; expected CN comes from the authoritative adapter."""
+    """Already-issued material; the authoritative adapter supplies the User UUID."""
 
     certificate_chain_pem: bytes = field(repr=False)
     private_key_pem: bytes = field(repr=False)
     password: str = field(repr=False)
-    expected_cn: str
+    expected_user_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class PublicCredential:
+    """Public leaf metadata supplied by Core and checked against export material."""
+
+    fingerprint_sha256: str
+    serial_hex: str
+    issuer_id: str
+    not_before: datetime
+    not_after: datetime
 
 
 def _certificates(pem: bytes) -> list[x509.Certificate]:
@@ -53,11 +65,19 @@ def validate_client_credential(
         raise ValueError("PKCS#12 password must be 6 to 128 printable ASCII characters")
     certificates = _certificates(credential.certificate_chain_pem)
     leaf = certificates[0]
-    names = leaf.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-    if not credential.expected_cn or len(names) != 1 or names[0].value != credential.expected_cn:
-        raise ValueError("Client certificate does not match the expected CN")
     if _is_ca(leaf) or not leaf.not_valid_before_utc <= now < leaf.not_valid_after_utc:
         raise ValueError("Client certificate is not a currently valid leaf")
+    if not isinstance(credential.expected_user_id, UUID):
+        raise ValueError("Expected User ID must be a UUID")
+    names: list[str]
+    try:
+        names = leaf.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(
+            x509.UniformResourceIdentifier
+        )
+    except x509.ExtensionNotFound:
+        names = []
+    if [name for name in names if name.lower().startswith("urn:uuid:")] != [f"urn:uuid:{credential.expected_user_id}"]:
+        raise ValueError("Client certificate does not match the expected User URI SAN")
     for child, issuer in zip(certificates, certificates[1:], strict=False):
         if not _is_ca(issuer):
             raise ValueError("Client chain contains a non-CA issuer")
@@ -72,6 +92,24 @@ def validate_client_credential(
     ) != leaf.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo):
         raise ValueError("Client private key does not match the certificate")
     return key, certificates
+
+
+def public_credential(certificates: list[x509.Certificate]) -> PublicCredential:
+    """Derive the public record from a leaf and its issuing CA certificate."""
+    if len(certificates) < 2 or not _is_ca(certificates[1]):
+        raise ValueError("Client chain needs its issuing CA certificate")
+    leaf, issuer = certificates[:2]
+    leaf.verify_directly_issued_by(issuer)
+    issuer_key = issuer.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return PublicCredential(
+        leaf.fingerprint(hashes.SHA256()).hex(),
+        format(leaf.serial_number, "x"),
+        "issuer-sha256:" + hashlib.sha256(issuer.subject.public_bytes() + issuer_key).hexdigest(),
+        leaf.not_valid_before_utc,
+        leaf.not_valid_after_utc,
+    )
 
 
 def client_keystore(credential: ClientCredential, *, now: datetime) -> bytes:
