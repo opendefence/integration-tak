@@ -105,11 +105,13 @@ Both images currently print help by default.
 Both images run as UID 10001.
 The API image contains no Java runtime or JNI dependency.
 The default operator image contains Java 17 and the published TAK 5.8.69 `UserManager.jar`.
-This JAR is an I0 test input. The sibling release-92 image is available locally but is not published.
+This JAR is an I0 test input.
+Use the sibling release-92 image for integration tests.
+CI builds tak-operator with the published TAK Server image selected by `TAK_SERVER_IMAGE`.
 Use `--build-arg TAKSERVER_IMAGE=localhost/tak-server:release-92` to build an operator with that JAR.
 Pass `--jar-sha256 0fe547c2f4ce05d06a2e9724e0c2837eab0a0ba5be398390bb974b2385ce6f14`
 to `docker/check_runtime.py operator` when you check the release-92 image.
-The server project must publish an agreed image digest and finish strict authentication before I1 can finish.
+The tak-operator must verify strict authentication in both TAK JVMs before I1 can finish.
 
 Run `podman build --target api-test -t localhost/opendefence-integration-tak-api:test .` to build the container test environment.
 Run `podman run --rm localhost/opendefence-integration-tak-api:test` to test it.
