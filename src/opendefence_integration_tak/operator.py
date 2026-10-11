@@ -67,9 +67,15 @@ class ProjectionReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class CredentialGrant:
+    credential: PublicCredential
+    tak_role: str
+
+
+@dataclass(frozen=True, slots=True)
 class CredentialProjection:
     previous: tuple[PublicCredential, ...]
-    desired: tuple[PublicCredential, ...]
+    desired: tuple[CredentialGrant, ...]
 
 
 class Projector(Protocol):
@@ -87,6 +93,8 @@ class Projector(Protocol):
         Read TAK state because the binding may predate this annotation or a write may be partial.
         An empty desired set removes access.
         Implementations own one JVM in this process and return Python values only.
+        Apply each desired grant to its exact fingerprint and issuer/serial pair.
+        Remove grants for credentials absent from desired before confirming readback.
         A receipt requires verified messaging AND API enforcement. Never synthesize
         it from file-auth or scalar registerCert results.
         """
@@ -142,9 +150,18 @@ def binding_name(user: User) -> str:
     return "tak-" + hashlib.sha256(user.metadata.uid.encode()).hexdigest()[:32]
 
 
-def accepted_user_credentials(user: User, now: datetime) -> tuple[PublicCredential, ...]:
+def _approved_user(user: User, now: datetime) -> bool:
     approved_at = user.spec.approved_at
-    if approved_at is None or approved_at.tzinfo is None or approved_at > now or user.spec.revoked_at is not None:
+    return (
+        approved_at is not None
+        and approved_at.tzinfo is not None
+        and approved_at <= now
+        and user.spec.revoked_at is None
+    )
+
+
+def accepted_user_credentials(user: User, now: datetime) -> tuple[PublicCredential, ...]:
+    if not _approved_user(user, now):
         return ()
     try:
         return accepted_credential_records(
@@ -153,6 +170,19 @@ def accepted_user_credentials(user: User, now: datetime) -> tuple[PublicCredenti
         )
     except ValueError:
         return ()
+
+
+def projected_tak_role(user: User, now: datetime) -> str | None:
+    if not _approved_user(user, now):
+        return None
+    if (
+        user.metadata is None
+        or user.metadata.generation is None
+        or user.status is None
+        or user.status.observed_generation != user.metadata.generation
+    ):
+        raise ProjectionUnavailable("User role projection is not current")
+    return "ROLE_ADMIN" if any(role.name == "superadmin" for role in user.status.roles) else "ROLE_READONLY"
 
 
 def applied_credentials(binding: UserBinding) -> tuple[PublicCredential, ...]:
@@ -297,8 +327,10 @@ class BindingReconciler:
         credentials = accepted_user_credentials(user, datetime.now(UTC))
         invalid_credentials = not credentials
         try:
+            tak_role = projected_tak_role(user, datetime.now(UTC)) if credentials else None
+            grants = tuple(CredentialGrant(record, tak_role) for record in credentials if tak_role is not None)
             receipt = self.projector.reconcile(
-                user, groups, roles, CredentialProjection(previous_credentials, credentials), revision
+                user, groups, roles, CredentialProjection(previous_credentials, grants), revision
             )
         except ProjectionUnavailable:
             return self._status(

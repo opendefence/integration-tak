@@ -15,11 +15,14 @@ from opendefence_integration_tak.certificates import ACCEPTED_CREDENTIALS_ANNOTA
 
 from opendefence_integration_tak.operator import (
     BindingReconciler,
+    CredentialGrant,
     CredentialProjection,
     ProjectionReceipt,
+    ProjectionUnavailable,
     UnavailableProjector,
     binding_name,
     input_revision,
+    projected_tak_role,
     set_condition,
 )
 from lib_opendefence_core.models.v1alpha1 import (
@@ -36,7 +39,7 @@ from lib_opendefence_core.models.v1alpha1 import (
     UserSpec,
     UserStatus,
 )
-from lib_opendefence_core.models.v1alpha1.common import PlatformCondition
+from lib_opendefence_core.models.v1alpha1.common import PlatformCondition, ResolvedRef
 from tests.kubernetes import KubernetesFixture
 
 
@@ -65,6 +68,7 @@ def core_user() -> User:
             annotations={ACCEPTED_CREDENTIALS_ANNOTATION: credentials},
         ),
         spec=UserSpec(callsign="first", approvedAt=now - timedelta(hours=1)),
+        status=UserStatus(observedGeneration=1),
     )
 
 
@@ -74,7 +78,7 @@ class FixtureProjector:
         self.failure = False
         self.mutate: User | None = None
         self.seen_previous: list[tuple[PublicCredential, ...]] = []
-        self.seen_credentials: list[tuple[PublicCredential, ...]] = []
+        self.seen_credentials: list[tuple[CredentialGrant, ...]] = []
 
     def reconcile(
         self,
@@ -87,7 +91,7 @@ class FixtureProjector:
         self.seen_previous.append(credentials.previous)
         self.seen_credentials.append(credentials.desired)
         if credentials.desired:
-            assert len(credentials.desired) == 1 and credentials.desired[0].fingerprint_sha256 == "a" * 64
+            assert len(credentials.desired) == 1 and credentials.desired[0].credential.fingerprint_sha256 == "a" * 64
         if self.failure:
             raise RuntimeError("fixture partial write")
         if self.mutate is not None:
@@ -130,6 +134,50 @@ def test_unavailable_authority_and_idempotency() -> None:
     writes = len(fixture.writes)
     worker.reconcile(user, [], [])
     assert len(fixture.writes) == writes
+
+
+def test_projected_roles_drive_tak_roles_without_core_operator() -> None:
+    projector = FixtureProjector()
+    worker, fixture, user = reconciler(projector)
+    now = datetime.now(UTC)
+    user.spec.role_refs = [ObjectRef(name="superadmin")]
+    assert projected_tak_role(user, now) == "ROLE_READONLY"
+    fixture.put(user, "users")
+    assert condition(worker.reconcile(user, [], [])).status == "True"
+    assert projector.seen_credentials[-1][0].tak_role == "ROLE_READONLY"
+
+    assert user.status is not None
+    user.status.roles = [ResolvedRef(name="superadmin", uid="role-uid")]
+    fixture.put(user, "users")
+    assert condition(worker.reconcile(user, [], [])).status == "True"
+    assert projector.seen_credentials[-1][0].tak_role == "ROLE_ADMIN"
+    assert projector.seen_credentials[-1][0].credential.fingerprint_sha256 == "a" * 64
+    assert projector.seen_credentials[-1][0].credential.serial_hex == "1"
+
+    assert user.metadata is not None and user.metadata.annotations is not None
+    accepted = user.metadata.annotations.pop(ACCEPTED_CREDENTIALS_ANNOTATION)
+    fixture.put(user, "users")
+    assert condition(worker.reconcile(user, [], [])).status == "False"
+    assert projector.seen_previous[-1][0].fingerprint_sha256 == "a" * 64
+    assert projector.seen_credentials[-1] == ()
+
+    user.metadata.annotations[ACCEPTED_CREDENTIALS_ANNOTATION] = accepted
+    user.status.roles = []
+    fixture.put(user, "users")
+    assert condition(worker.reconcile(user, [], [])).status == "True"
+    assert projector.seen_credentials[-1][0].tak_role == "ROLE_READONLY"
+
+    assert user.metadata is not None
+    user.metadata.generation = 2
+    with pytest.raises(ProjectionUnavailable):
+        projected_tak_role(user, now)
+    assert condition(worker.reconcile(user, [], [])).status == "False"
+    assert projector.seen_credentials[-1][0].tak_role == "ROLE_READONLY"
+
+    user.spec.revoked_at = now
+    assert projected_tak_role(user, now) is None
+    assert condition(worker.reconcile(user, [], [])).status == "False"
+    assert projector.seen_credentials[-1] == ()
 
 
 def test_full_readback_and_refresh() -> None:
@@ -352,7 +400,7 @@ def test_removed_credentials_reach_projector_before_binding_stays_unready() -> N
     assert saved["credentials"][0]["fingerprintSha256"] == "a" * 64
     projector.receipt = None
     assert condition(worker.reconcile(user, [], [])).status == "False"
-    assert projector.seen_previous[-1] == projector.seen_credentials[0]
+    assert projector.seen_previous[-1] == tuple(grant.credential for grant in projector.seen_credentials[0])
     assert projector.seen_credentials[-1] == ()
     binding = worker.bindings.get(binding_name(user), "tak")
     assert binding.metadata and binding.metadata.annotations
@@ -369,7 +417,7 @@ def test_applied_credentials_survive_reconciler_restart() -> None:
     user.metadata.annotations = {}
     assert condition(restarted.reconcile(user, [], [])).reason == "CredentialsUnavailable"
     assert isinstance(restarted.projector, FixtureProjector)
-    assert restarted.projector.seen_previous[-1] == first.seen_credentials[0]
+    assert restarted.projector.seen_previous[-1] == tuple(grant.credential for grant in first.seen_credentials[0])
 
 
 def test_invalid_applied_state_recovers_from_verified_projection() -> None:

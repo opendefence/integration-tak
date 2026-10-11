@@ -32,7 +32,20 @@ the CRD snapshot remains the schema reference for the cluster installation.
 
 All five CRDs expose a status subresource, generic conditions, and nullable `status.observedGeneration`.
 Reference inputs identify objects by resource name. Resolved User and Group references also carry Kubernetes UIDs.
-`User.status.roles` explicitly contains direct roles; it is not the effective inherited role set.
+The published model describes `User.status.roles` as direct resolved roles.
+The project owner now defines these User status roles and memberships as the trusted integration projections.
+Core must publish effective roles in `User.status.roles` before group-derived permissions can reach integrations.
+The tak-operator uses the projected roles and does not calculate roles from `spec.roleRefs`.
+It treats `user` as implied for each approved User.
+It maps `superadmin` to TAK `ROLE_ADMIN`.
+It maps other approved Users to TAK `ROLE_READONLY`.
+The requested projection binds the TAK role to accepted certificate fingerprints and issuer plus serial values.
+A native projector must remove a grant when that certificate leaves the accepted set.
+It must not grant a role by callsign or certificate CN.
+It requires `status.observedGeneration` to match the User generation before it requests a TAK role.
+Tests can patch the User status through the CRD without a running core-operator.
+The tak-operator does not mark a UserBinding ready until TAK confirms the complete credential and permission projection.
+The current `UnavailableProjector` makes no native role grants and leaves bindings unready.
 The supplied RBAC belongs to the Core service account. It does not grant the TAK integration access.
 The integration still needs its own resource and namespaced binding/status permissions.
 
@@ -41,7 +54,7 @@ The integration still needs its own resource and namespaced binding/status permi
 | Contract | Established rule or supplied field | Decision still required |
 | --- | --- | --- |
 | Identity | Use an immutable User UUID in a canonical `urn:uuid:<uuid>` URI SAN. Treat the CN as display text. Keep callsign mutable and outside the certificate. The current CRD has no separate identity UUID field. | Confirm the persistent UUID source, restore behavior, and CSR validation. The API draft uses compact Base64URL paths; the CRD does not define that path encoding. |
-| Effective access | User direct roles/groups and Group parent/managers/roles are defined. The handoff requires upward membership, role union, and no permission from manager status alone. | Supply the shared evaluator or conformance rules, including TAK role mapping, unresolved references, group moves, role edits, revisions, and freshness. `Role` has no permission map and User status does not provide the inherited result. |
+| Effective access | Integrations trust `User.status.roles` and `User.status.groups`. Approved Users have the implied `user` role. The tak-operator maps `superadmin` to TAK admin. | Core must publish effective group-derived roles and memberships in User status. The current model descriptions still say direct roles and groups. Define freshness across related Group and Role changes. |
 | User approval and revocation | `User.spec.approvedAt` marks user approval; `revokedAt` marks user revocation. | Define trusted writers and the current authorization/freshness rule. User approval does not identify an approved certificate purpose or generation. |
 | Credential inventory | Core owns approval, purpose, validity, history, and revocation. The new handoff proposes one Core-owned User annotation with a versioned array of accepted public records. The integration provisionally reads `platform.opendefence.fi/accepted-credentials`. Each record has a leaf SHA-256, serial, issuer ID, and validity times. | Confirm the annotation key and wire schema. Supply purpose, predecessor, deadline, and compromised or superseded states. `User.status.publicKey` cannot supply this inventory. |
 | Integration certificate identity | Installing an integration authorizes one instance. The planned IntegrationManifest has a separate identity and Core-owned public credential status. Do not create a service User or UserBinding for it. | Define manifest scope, identity SAN, named credential requests, connection purposes, status ownership, and destination acknowledgements. Core or the issuer must send an authenticated renewal notice. Keep the old keypair until all destinations acknowledge the replacement. TAK needs the current installed-identity inventory for 8443 and 8089. |
