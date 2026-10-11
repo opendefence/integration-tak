@@ -286,6 +286,8 @@ A request without a client certificate received no HTTP response.
 The operator logged temporary management errors while TAK restarted. The errors stopped after TAK became Ready.
 These checks do not prove strict admission, Core authorization, or safe administrator certificate rotation.
 The local certificate is for the disposable test cluster. Production must supply an identity from a CA trusted by TAK.
+Production renewal needs a notification from Core or the issuer before the operator changes TAK's administrator fingerprint.
+The notification must bind the installed integration, issuer, new fingerprint, and Secret revision.
 
 ## Next action
 

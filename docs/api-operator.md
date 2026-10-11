@@ -162,8 +162,12 @@ It rejects a different fingerprint under the same CN to avoid replacing an exist
 Ensure that TAK also trusts the certificate for TLS client authentication before using the REST API.
 In strict mode, bind the certificate to the installed integration identity. The current TAK candidate pins its exact public leaf through `tak-integration-admin`; no second certificate approval is required.
 Issue the certificate from a CA in TAK's client truststore.
-Production issuance and rotation need an agreed issuer and trust update contract.
-Do not rely on automatic renewal until the operator can replace and verify the pinned administrator fingerprint.
+Core or the certificate issuer must send an authenticated notice before the operator adopts a renewed certificate.
+The notice must identify the installed integration, trusted issuer, new certificate fingerprint, and Secret revision.
+The renewal flow must retain the old keypair until the operator verifies the new administrator fingerprint and a new 8443 mTLS request.
+The operator must reject a notice that does not match the renewed Secret, trusted issuer, or installed integration.
+Production still needs the notice transport, issuer trust, TAK trust activation, overlap, and failure rules before the operator can replace the pinned fingerprint.
+The local operator polls the projected Secret. This poll does not implement the production renewal notice.
 Run `task --yes smoke` to verify local TLS authentication and administrator access after bootstrap.
 Keep this management identity separate from user credentials and the delivery API workload.
 
