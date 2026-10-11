@@ -3,7 +3,8 @@
 ## Stage and model
 
 I0 is code-complete and locally verified on ARM64.
-I1 is incomplete. The 5.8.84 component probe is complete and proves an approved-set failure.
+I1 is incomplete. The 5.8.84 component probe proves an approved-set failure.
+The current sibling candidate is TAK 5.8.92. Its strict admission hooks are installed, but the policy is not connected to authentication.
 I2 includes the package builder, seven REST operations, Secret-backed grants and UserBinding reconciliation.
 The stack Kustomization composes the sibling TAK Server integrated overlay with the
 integration workloads. Separate entry points render the schema and grants Jobs.
@@ -26,6 +27,7 @@ Production Core authority and strict TAK projection adapters remain unavailable.
 Core CRD shapes and UserBinding ownership are supplied. The operator uses
 `lib-opendefence-core==0.2.1+261010` models from the user-supplied Nexus index.
 Production authorization and credential adapters still need semantic contracts.
+The release-92 operator image also passed a native JNI check and a Kind binding lifecycle check.
 The integration is not release-ready.
 
 | Gate | Required setting | Confirmation |
@@ -49,7 +51,7 @@ The completed I2 application slice and remaining adapters are described in [API 
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
 - Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
-- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `52fcef9`; it does not complete strict authentication.
+- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `6c8aa1c`; it selects TAK 5.8.92 but does not complete strict authentication.
 - Server packaging: `61a8273` adds the integrated overlay and Zarf inputs. The integrated overlay still uses legacy authentication.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives), `3739c08` (HTTP routes, grants and binding reconciliation).
 - Integration deployment commits: `a98e6a2` (server overlay), `1b9359d` (Zarf manifest package), `2b030a4` (live deployment fix).
@@ -195,7 +197,7 @@ Both supplied untracked inputs remain unchanged. No tokens, credential material 
 The I0 native check used TAK `5.8-RELEASE-69`, Java `17.0.20.1+1`,
 PyJNIus `1.7.0`, and Linux Python `3.14.8`.
 This check does not prove remote server compatibility.
-Candidate 5.8.84 is component-verified but remains live integration-unverified.
+The former 5.8.84 candidate is component-verified but remains live integration-unverified.
 Its checksums are in `docs/i1-findings.md`.
 The sibling image built at `36bdeb8` supplied the 5.8.84 `UserManager.jar` for an operator smoke image.
 That JAR has SHA-256 `4ad7adcb9a09156d7122bfb2d4ddf3fd6705fb612f4d521335a5e08b449d24f6`.
@@ -226,11 +228,36 @@ Unrelated Podman state was preserved.
 The current test context is `kind-opendefence-dev`, namespace `integration-tak`.
 The five supplied Core CRDs and the Zarf local package were installed there.
 The package runs the API and operator images built from this checkout.
-The running operator uses the 5.8.84 smoke image. No test User or UserBinding remains.
+The running operator uses the 5.8.92 smoke image. No test User or UserBinding remains.
 No PVCs or registry publications were changed.
 Temporary I1 evidence remains in `/private/tmp/integration-tak-i1/`.
 Temporary I2 test and build logs remain in `/private/tmp/integration-tak-*-i2.log`.
 No fixture keys, certificates, or ZIPs were saved as evidence.
+
+## TAK 5.8.92 candidate check
+
+The sibling checkout at `6c8aa1c` selects `5.8-RELEASE-92`.
+Its local ARM64 image is `localhost/tak-server:release-92`, manifest
+`sha256:12ecb27b054b05ce612bbd5b16d84e2544bad4c3e33d78b2edf57265e9ad78d2`.
+The image supplies `UserManager.jar` with SHA-256
+`0fe547c2f4ce05d06a2e9724e0c2837eab0a0ba5be398390bb974b2385ce6f14`.
+See the [sibling release record](../../tak-server/docs/release-92-candidate.md) for its server checks.
+
+The operator built with `--build-arg TAKSERVER_IMAGE=localhost/tak-server:release-92`.
+The local image is `localhost/opendefence-integration-tak-operator:tak-5.8.92-smoke`, image ID
+`78afd77c3473a8df427d0d639da765148f78822ddf86815a913ded075e7414b6`.
+`docker/check_runtime.py operator --jar-sha256 0fe547c2f4ce05d06a2e9724e0c2837eab0a0ba5be398390bb974b2385ce6f14`
+passed inside that image. It checked the JAR hash, Python runtime boundary, Java 17, and one native JNI call.
+The checker also passed without the override against the existing 5.8.69 operator image.
+
+The release-92 operator became Available in `kind-opendefence-dev` with zero restarts.
+The rollout used `kubectl set image`; the Zarf package was not rebuilt.
+A test User produced a UserBinding with `Synced=False` and `AuthorityUnavailable`.
+Kubernetes removed the binding after the User was deleted.
+The test left no User or UserBinding.
+The Dockerfile default still selects the published 5.8.69 server image.
+The sibling release-92 runtime image is local and unpublished, so builds must supply it with `TAKSERVER_IMAGE`.
+This check does not prove strict authentication or production projection.
 
 ## Next action
 

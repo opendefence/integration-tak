@@ -73,9 +73,12 @@ Run `podman build --target operator -t localhost/opendefence-integration-tak-ope
 Both images currently print help by default.
 Both images run as UID 10001.
 The API image contains no Java runtime or JNI dependency.
-The operator image contains Java 17 and the pinned prototype `UserManager.jar`.
-This JAR is an I0 test input, not the final server compatibility contract.
-The server project must provide the agreed image digest and JAR checksum before I1 can finish.
+The default operator image contains Java 17 and the published TAK 5.8.69 `UserManager.jar`.
+This JAR is an I0 test input. The sibling release-92 image is available locally but is not published.
+Use `--build-arg TAKSERVER_IMAGE=localhost/tak-server:release-92` to build an operator with that JAR.
+Pass `--jar-sha256 0fe547c2f4ce05d06a2e9724e0c2837eab0a0ba5be398390bb974b2385ce6f14`
+to `docker/check_runtime.py operator` when you check the release-92 image.
+The server project must publish an agreed image digest and finish strict authentication before I1 can finish.
 
 Run `podman build --target api-test -t localhost/opendefence-integration-tak-api:test .` to build the container test environment.
 Run `podman run --rm localhost/opendefence-integration-tak-api:test` to test it.
