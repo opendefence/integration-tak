@@ -45,7 +45,13 @@ Sibling links require these local checkouts; provide their files or equivalent c
 The integration can create a dedicated mTLS certificate for its access to TAK's port 8443 REST API.
 Its operator registers that certificate as a trusted administrator through JNI.
 TAK must also trust the certificate for TLS client authentication.
-Strict mode must explicitly approve the certificate before the REST API can use it.
+The installed integration's certificate identity is trusted because an administrator applied its Zarf package.
+Do not require a second approval.
+Strict mode must bind the presented certificate to that installed identity before the REST API can use it.
+Other installed integrations may need port 8443 or 8089.
+Core's IntegrationManifest contract must define how status reports each integration's own mTLS certificate serial.
+It must define identity, issuer, rotation, removal, and freshness checks.
+A serial alone is not a global certificate identity.
 Keep the private key in an integration-owned Secret and outside the delivery API Pod.
 
 Use the current candidate only as a recorded baseline:

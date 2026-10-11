@@ -158,7 +158,7 @@ The current JNI bootstrap mounts only the public certificate.
 The operator registers the certificate as an administrator through JNI and verifies the stored fingerprint and role.
 It rejects a different fingerprint under the same CN to avoid replacing an existing administrator.
 Ensure that TAK also trusts the certificate for TLS client authentication before using the REST API.
-In strict mode, add the exact certificate to the explicit approval state.
+In strict mode, bind the certificate to the installed integration identity. The current TAK candidate pins its exact public leaf through `tak-integration-admin`; no second certificate approval is required.
 Issue the certificate from a CA in TAK's client truststore.
 Certificate creation and rotation need an agreed issuer and trust update contract.
 Verify TLS authentication and administrator access after bootstrap.

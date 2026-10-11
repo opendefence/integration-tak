@@ -170,6 +170,7 @@ Obtain versioned contracts or shared conformance implementations for these bound
 | Identity | Persistent immutable UUID source, public/CN encoding, normalization, restore behavior, and initial CSR flow. |
 | Effective permissions | Group ancestry, role union, revisions, freshness, and changes caused by group moves or role edits. |
 | Credential inventory | Approved generations, purpose, issuer/serial, SHA-256 fingerprint, validity, predecessor mapping, and superseded/compromised states. |
+| Installed integration identity | Ask Core to document how IntegrationManifest status reports the integration's own mTLS certificate serial and binds it to the manifest identity and issuer. State the encoding, trust source, rotation, removal, readiness, and freshness rules. Zarf installation is authorization; there is no second certificate approval. TAK must apply the current installed-identity inventory for 8443 and 8089. |
 | Issuance and export | Permission to reuse a main key, TAK-only issuance for client-held main keys, renewal approval, and restart recovery. |
 | Kubernetes ownership | Credential namespaces, permitted Secret readers, retention, applied revisions, and current readiness. UserBinding scope and integration writers are supplied. |
 | HTTP authority | Verified mTLS identity, trusted headers, spoofed-header removal, authorization deadlines, and direct-service access controls. |
