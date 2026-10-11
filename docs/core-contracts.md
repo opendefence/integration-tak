@@ -42,6 +42,11 @@ It maps other approved Users to TAK `ROLE_READONLY`.
 The requested projection binds the TAK role to accepted certificate fingerprints and issuer plus serial values.
 One User identity owns one TAK account and one UserBinding.
 Several accepted certificates can connect to that account during rollover.
+The core-operator refuses deletion after `spec.approvedAt` is set.
+Revoke an approved User with `spec.revokedAt`.
+Keep the revoked User as a permanent revocation record.
+The tak-operator requests removal of all accepted credentials for that User.
+It keeps the UserBinding while the revoked User remains.
 A native projector must remove only a certificate that leaves the accepted set.
 It must keep the account, its role, and the other accepted certificates.
 It must not grant a role by callsign or certificate CN.

@@ -296,8 +296,10 @@ def test_receipt_expires_during_core_readback(monkeypatch: pytest.MonkeyPatch) -
     assert condition(worker.reconcile(user, [], [])).reason == "ProjectionUnverified"
 
 
-def test_recreated_user_gets_new_binding() -> None:
+def test_recreated_unapproved_user_gets_new_binding() -> None:
     worker, fixture, user = reconciler(UnavailableProjector())
+    user.spec.approved_at = None
+    fixture.put(user, "users")
     original = worker.reconcile(user, [], [])
     assert user.metadata is not None
     user.metadata.uid = "replacement-user"
@@ -472,14 +474,34 @@ def test_invalid_applied_state_recovers_from_verified_projection() -> None:
     assert updated.metadata.annotations["integration.opendefence.fi/applied-credentials"] != "broken"
 
 
-@pytest.mark.parametrize("change", ["unapproved", "revoked"])
-def test_user_approval_state_removes_credential_access(change: str) -> None:
+def test_pending_user_has_no_credential_access() -> None:
     projector = FixtureProjector()
-    worker, _, user = reconciler(projector)
-    assert condition(worker.reconcile(user, [], [])).status == "True"
-    if change == "unapproved":
-        user.spec.approved_at = None
-    else:
-        user.spec.revoked_at = datetime.now(UTC)
+    worker, fixture, user = reconciler(projector)
+    user.spec.approved_at = None
+    fixture.put(user, "users")
     assert condition(worker.reconcile(user, [], [])).status == "False"
     assert projector.seen_credentials[-1] == ()
+
+
+def test_revoked_user_and_binding_remain_after_credential_removal() -> None:
+    projector = FixtureProjector()
+    worker, fixture, user = reconciler(projector)
+    original = worker.reconcile(user, [], [])
+    assert condition(original).status == "True"
+    assert user.metadata is not None
+    user.spec.revoked_at = datetime.now(UTC)
+    fixture.put(user, "users")
+
+    revoked = worker.reconcile(user, [], [])
+    assert revoked.name == original.name
+    assert condition(revoked).status == "False"
+    assert projector.seen_previous[-1][0].fingerprint_sha256 == "a" * 64
+    assert projector.seen_credentials[-1] == ()
+    assert revoked.metadata is not None and revoked.metadata.annotations is not None
+    assert (
+        json.loads(revoked.metadata.annotations["integration.opendefence.fi/applied-credentials"])["credentials"] == []
+    )
+    retained = worker.users.get(user.name or "")
+    assert retained.metadata is not None and retained.metadata.uid == user.metadata.uid
+    assert retained.spec.revoked_at == user.spec.revoked_at
+    assert len([item for item in fixture.objects.values() if isinstance(item, UserBinding)]) == 1
