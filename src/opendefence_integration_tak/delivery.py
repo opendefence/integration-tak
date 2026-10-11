@@ -50,6 +50,10 @@ class Principal:
     credential_id: str
     valid_until: datetime
 
+    def check_validity(self, now: datetime) -> None:
+        if self.valid_until.tzinfo is None or self.valid_until <= now:
+            raise DeliveryError(403, "access-denied")
+
 
 @dataclass(frozen=True, slots=True)
 class ApprovedCredential:

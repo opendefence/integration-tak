@@ -28,7 +28,7 @@ from opendefence_integration_tak.delivery import (
     compact_uuid,
     parse_user_id,
 )
-from opendefence_integration_tak.grants import SecretGrantStore
+from opendefence_integration_tak.grants import Grant, SecretGrantStore
 from opendefence_integration_tak.packages import PackageSettings
 from opendefence_integration_tak.resources import Secret
 from tests.conftest import CredentialFixture
@@ -369,6 +369,57 @@ def test_delete_during_render_blocks_release(api: APIFixture, monkeypatch: pytes
 
     monkeypatch.setattr(api.authority, "package", package)
     assert api.client.get(grant["downloadUrl"]).status_code == 404
+
+
+@pytest.mark.parametrize("redemption", [False, True])
+def test_authorization_expires_during_final_snapshot(
+    api: APIFixture, monkeypatch: pytest.MonkeyPatch, redemption: bool
+) -> None:
+    url = api.create_grant()["downloadUrl"] if redemption else api.package_path + "/content"
+    api.authority.principal = replace(api.authority.principal, valid_until=api.authority.now + timedelta(seconds=1))
+    reads = 0
+
+    async def delayed(principal: Principal, profile_id: str, now: datetime) -> PackageSnapshot:
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            api.authority.now += timedelta(seconds=1)
+        return api.authority.snapshot
+
+    monkeypatch.setattr(api.authority, "package", delayed)
+    response = api.client.get(url)
+    assert response.status_code == (404 if redemption else 403)
+    assert not response.content.startswith(b"PK")
+
+
+@pytest.mark.parametrize("deadline", ["principal", "authority", "credential"])
+def test_deadlines_expire_during_final_grant_read(
+    api: APIFixture, monkeypatch: pytest.MonkeyPatch, deadline: str
+) -> None:
+    grant = api.create_grant()
+    expires = api.authority.now + timedelta(seconds=1)
+    if deadline == "principal":
+        api.authority.principal = replace(api.authority.principal, valid_until=expires)
+    elif deadline == "authority":
+        api.authority.snapshot = replace(api.authority.snapshot, authority_until=expires)
+    else:
+        snapshot = api.authority.snapshot
+        api.authority.snapshot = replace(snapshot, approved=(replace(snapshot.approved[0], expires_at=expires),))
+    get = SecretGrantStore.get
+    reads = 0
+
+    async def delayed(store: SecretGrantStore, grant_id: str) -> Grant | None:
+        nonlocal reads
+        value = await get(store, grant_id)
+        reads += 1
+        if reads == 2:
+            api.authority.now += timedelta(seconds=1)
+        return value
+
+    monkeypatch.setattr(SecretGrantStore, "get", delayed)
+    response = api.client.get(grant["downloadUrl"])
+    assert response.status_code == (404 if deadline == "principal" else 503)
+    assert not response.content.startswith(b"PK")
 
 
 def test_unexpected_adapter_error_is_redacted(

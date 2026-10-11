@@ -100,6 +100,7 @@ Invalid, absent, expired, deleted and denied capabilities return uniform `404` r
 Authority or storage outages return `503`.
 GET and HEAD do not consume grants.
 A final grant read prevents release after a deletion observed before that release decision.
+The API rechecks authorization and package deadlines after the final storage read.
 Bytes already authorized or sent cannot be recalled.
 
 Exclude the grant Secret from backups. Restore it as a new empty Secret.

@@ -141,13 +141,9 @@ class PackageAPI:
 
     async def current_principal(self, principal: Principal) -> Principal:
         current = await self.authority.authorize(principal.user_id, principal.credential_id, self.clock())
-        if (
-            current.user_id != principal.user_id
-            or current.credential_id != principal.credential_id
-            or current.valid_until.tzinfo is None
-            or current.valid_until <= self.clock()
-        ):
+        if current.user_id != principal.user_id or current.credential_id != principal.credential_id:
             raise DeliveryError(403, "access-denied")
+        current.check_validity(self.clock())
         return current
 
     async def snapshot(self, principal: Principal, profile_id: str) -> PackageSnapshot:
@@ -250,6 +246,7 @@ class PackageAPI:
         fresh = await self.snapshot(principal, profile)
         if fresh.state(self.clock()) != "ready" or fresh.revision(profile) != snapshot.revision(profile):
             raise DeliveryError(503, "package-unavailable")
+        principal.check_validity(self.clock())
         return response
 
     async def create_grant(self, request: Request) -> Response:
@@ -344,14 +341,16 @@ class PackageAPI:
             self.check_grant_snapshot(grant, snapshot)
             response = await self.render(snapshot, grant.profile_id)
             principal = await self.current_principal(principal)
-            self.check_grant_snapshot(grant, await self.snapshot(principal, grant.profile_id))
+            fresh = await self.snapshot(principal, grant.profile_id)
+            # This is the final grant read: a completed DELETE blocks later release decisions.
+            if await self.grants.get(grant_id) != grant or grant.expires_at <= self.clock():
+                raise DeliveryError(404, "not-found")
+            self.check_grant_snapshot(grant, fresh)
+            principal.check_validity(self.clock())
         except DeliveryError as error:
             if error.status in (401, 403, 404):
                 raise DeliveryError(404, "not-found") from None
             raise
-        # This is the final grant read: a completed DELETE blocks later release decisions.
-        if await self.grants.get(grant_id) != grant or grant.expires_at <= self.clock():
-            raise DeliveryError(404, "not-found")
         return response
 
     def check_grant_snapshot(self, grant: Grant, snapshot: PackageSnapshot) -> None:
