@@ -547,3 +547,24 @@ def test_revoked_user_and_binding_remain_after_credential_removal() -> None:
     assert retained.metadata is not None and retained.metadata.uid == user.metadata.uid
     assert retained.spec.revoked_at == user.spec.revoked_at
     assert len([item for item in fixture.objects.values() if isinstance(item, UserBinding)]) == 1
+
+
+def test_deleting_user_loses_credentials_roles_and_groups() -> None:
+    projector = FixtureProjector()
+    worker, fixture, user = reconciler(projector)
+    assert user.status is not None and user.metadata is not None
+    user.status.roles = [ResolvedRef(name="superadmin", uid="role-uid")]
+    user.status.groups = [ResolvedRef(name="team", uid="group-uid")]
+    fixture.put(user, "users")
+    original = worker.reconcile(user)
+    assert condition(original).status == "True"
+    user.metadata.deletion_timestamp = Time(datetime.now(UTC))
+    fixture.put(user, "users")
+
+    deleting = worker.reconcile(user)
+    assert deleting.name == original.name
+    assert condition(deleting).status == "False"
+    assert projector.seen_previous[-1][0].fingerprint_sha256 == "a" * 64
+    assert projector.seen_credentials[-1] == ()
+    assert projector.seen_roles[-1] is None
+    assert projector.seen_groups[-1] == ()

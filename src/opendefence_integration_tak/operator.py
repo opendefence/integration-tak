@@ -162,6 +162,8 @@ def _approved_user(user: User, now: datetime) -> bool:
         and approved_at.tzinfo is not None
         and approved_at <= now
         and user.spec.revoked_at is None
+        and user.metadata is not None
+        and user.metadata.deletion_timestamp is None
     )
 
 

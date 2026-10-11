@@ -148,7 +148,8 @@ The package exporter now checks the User UUID in the leaf URI SAN.
 Delivery compares Core's selected public credential record with the certificate used for export.
 The tak-operator reads the provisional accepted-credential User annotation and includes it in its input revision.
 It passes only current, valid public records to a projector. Missing or malformed metadata leaves the UserBinding unready.
-It passes an empty set when metadata is invalid or the User is unapproved or revoked, so a strict projector can remove old access.
+It passes an empty set when metadata is invalid or the User is unapproved, revoked, or deleting.
+The projector uses this empty set to remove old access.
 It passes the last verified applied records to the projector, including expired records.
 It writes the new applied set only after a verified projection receipt.
 It logs a malformed applied record and asks the projector to recover from TAK state.
