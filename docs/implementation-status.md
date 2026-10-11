@@ -14,6 +14,12 @@ Both flavors built as ARM64 archives and passed lint and manifest inspection wit
 The local archive deployed to `kind-opendefence-dev` after the Core CRDs were installed.
 Both deployments became Available. The API returned `503 authority-unavailable`, as expected.
 An added Secret key survived an archive upgrade under the same Secret UID. The test key was removed.
+The live operator created a UserBinding with `Synced=False` and `AuthorityUnavailable`.
+A callsign edit changed its input revision without setting `Synced=True`.
+Kubernetes removed the binding after the test User was deleted.
+Service-account checks allowed the API to get and update the named grant Secret.
+They denied Secret lists and access to `private-registry`.
+The operator could list Users and update binding status. It could not get Secrets or create Users.
 The package does not bundle images. Local Kind needs loaded images.
 Production needs reachable registry images and explicit deploy variables.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
@@ -39,11 +45,11 @@ The completed I2 application slice and remaining adapters are described in [API 
 ## Checkpoint and sources
 
 - Branch: `feat/i0-foundation`.
-- Implementation HEAD before this checkpoint: `2b030a4`.
+- Implementation HEAD before this checkpoint: `96df3cf`.
 - I0 commits: `a339af8` (tooling), `b8113f6` (images and CI), `d351aad` (checkpoint).
 - I1 commits: `4477bf6` (static findings), `67b94e2` (binary component probe), `27c7b97` (CoT overwrite).
 - Server policy: `7f1e42c`, merged into the main server workstream by `fc07196`. The separate worktree `../tak-server-strict-fingerprint` remains a historical checkpoint.
-- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `acaf5f8`; it does not complete strict authentication.
+- Current server plan: `fe005ee`, `../tak-server/docs/implementation-plan.md`. Required behavior changes use external launchers/runtime injection against unchanged vendor artifacts; fresh TAK source is no longer a prerequisite. The latest sibling commit checked was `52fcef9`; it does not complete strict authentication.
 - Server packaging: `61a8273` adds the integrated overlay and Zarf inputs. The integrated overlay still uses legacy authentication.
 - I2 commits: `b835793` (PKCS#12 export), `0f9d9db` (client archives), `3739c08` (HTTP routes, grants and binding reconciliation).
 - Integration deployment commits: `a98e6a2` (server overlay), `1b9359d` (Zarf manifest package), `2b030a4` (live deployment fix).
@@ -191,6 +197,12 @@ PyJNIus `1.7.0`, and Linux Python `3.14.8`.
 This check does not prove remote server compatibility.
 Candidate 5.8.84 is component-verified but remains live integration-unverified.
 Its checksums are in `docs/i1-findings.md`.
+The sibling image built at `36bdeb8` supplied the 5.8.84 `UserManager.jar` for an operator smoke image.
+That JAR has SHA-256 `4ad7adcb9a09156d7122bfb2d4ddf3fd6705fb612f4d521335a5e08b449d24f6`.
+A native JNI `User` round-trip passed. The rebuilt operator became Available in Kind.
+The server image ID is `bfe5accbb8085dff86d7598f29f7529fea50831f0c3b8f995d226f63dfc57fbb`.
+The operator image ID is `8abe4dc1eed1aa911a8e2cc37fcc160f075675a8058929baa748af26f997af12`.
+These checks do not prove strict admission or production projection.
 The final server image and Kubernetes base contract remain pending.
 I2 package images use Linux Python `3.14.8` and cryptography `50.0.2` on ARM64.
 The Java test image uses Temurin `17.0.20.1+1`. The API images contain no Java.
@@ -214,6 +226,7 @@ Unrelated Podman state was preserved.
 The current test context is `kind-opendefence-dev`, namespace `integration-tak`.
 The five supplied Core CRDs and the Zarf local package were installed there.
 The package runs the API and operator images built from this checkout.
+The running operator uses the 5.8.84 smoke image. No test User or UserBinding remains.
 No PVCs or registry publications were changed.
 Temporary I1 evidence remains in `/private/tmp/integration-tak-i1/`.
 Temporary I2 test and build logs remain in `/private/tmp/integration-tak-*-i2.log`.
