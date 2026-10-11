@@ -212,8 +212,7 @@ jobs:
   publish:
     needs: [version, python, images, zarf]
     if: >-
-      vars.PUBLISH_ENABLED == 'true' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: arc-runner-set
     permissions:
       contents: read

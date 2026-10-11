@@ -132,12 +132,11 @@ The shared Python setup installs all extras, so its job requires a JDK.
 The image job tests the API environment and both runtime targets.
 
 The Zarf build job runs on native AMD64 and ARM64 hosted runners.
-Set these repository variables before running the package jobs:
+Set this repository variable before running the package jobs:
 
 | Variable | Value |
 | --- | --- |
 | `TAK_SERVER_IMAGE` | Published TAK Server container reference with an `@sha256:` digest. The image must support both architectures. |
-| `PUBLISH_ENABLED` | Set to `true` to publish images and Zarf packages after all checks pass. |
 
 The build fails if the TAK Server image reference is missing or malformed.
 CI reads the image's `org.opencontainers.image.revision` label.
@@ -151,7 +150,7 @@ CI rejects archives whose rendered manifests include `platform.opendefence.fi` C
 The `local-dev` flavor is linted but is not published.
 
 Publishing uses `arc-runner-set` and the shared image publisher.
-Keep `PUBLISH_ENABLED` unset until registry setup and runtime acceptance are complete.
+CI publishes images and Zarf packages after the required checks pass.
 The publisher requires Docker CLI access and native AMD64 and ARM64 BuildKit services.
 The services must be reachable at `buildkit-amd64.buildkit.svc.cluster.local:1234`
 and `buildkit-arm64.buildkit.svc.cluster.local:1234`.
