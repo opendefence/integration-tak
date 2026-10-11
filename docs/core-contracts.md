@@ -40,7 +40,10 @@ It treats `user` as implied for each approved User.
 It maps `superadmin` to TAK `ROLE_ADMIN`.
 It maps other approved Users to TAK `ROLE_READONLY`.
 The requested projection binds the TAK role to accepted certificate fingerprints and issuer plus serial values.
-A native projector must remove a grant when that certificate leaves the accepted set.
+One User identity owns one TAK account and one UserBinding.
+Several accepted certificates can connect to that account during rollover.
+A native projector must remove only a certificate that leaves the accepted set.
+It must keep the account, its role, and the other accepted certificates.
 It must not grant a role by callsign or certificate CN.
 It requires `status.observedGeneration` to match the User generation before it requests a TAK role.
 Tests can patch the User status through the CRD without a running core-operator.

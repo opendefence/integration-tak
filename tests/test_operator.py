@@ -90,8 +90,6 @@ class FixtureProjector:
     ) -> ProjectionReceipt:
         self.seen_previous.append(credentials.previous)
         self.seen_credentials.append(credentials.desired)
-        if credentials.desired:
-            assert len(credentials.desired) == 1 and credentials.desired[0].credential.fingerprint_sha256 == "a" * 64
         if self.failure:
             raise RuntimeError("fixture partial write")
         if self.mutate is not None:
@@ -178,6 +176,41 @@ def test_projected_roles_drive_tak_roles_without_core_operator() -> None:
     assert projected_tak_role(user, now) is None
     assert condition(worker.reconcile(user, [], [])).status == "False"
     assert projector.seen_credentials[-1] == ()
+
+
+def test_certificate_rollover_preserves_one_user_binding_and_role() -> None:
+    projector = FixtureProjector()
+    worker, fixture, user = reconciler(projector)
+    assert user.status is not None and user.metadata is not None and user.metadata.annotations is not None
+    user.status.roles = [ResolvedRef(name="superadmin", uid="role-uid")]
+    fixture.put(user, "users")
+    original = worker.reconcile(user, [], [])
+    accepted = json.loads(user.metadata.annotations[ACCEPTED_CREDENTIALS_ANNOTATION])
+    replacement = accepted["credentials"][0] | {"fingerprintSha256": "b" * 64, "serialHex": "2"}
+    accepted["credentials"].append(replacement)
+    user.metadata.annotations[ACCEPTED_CREDENTIALS_ANNOTATION] = json.dumps(accepted)
+    fixture.put(user, "users")
+
+    overlap = worker.reconcile(user, [], [])
+    assert overlap.name == original.name
+    assert condition(overlap).status == "True"
+    assert {grant.credential.fingerprint_sha256 for grant in projector.seen_credentials[-1]} == {"a" * 64, "b" * 64}
+    assert {grant.tak_role for grant in projector.seen_credentials[-1]} == {"ROLE_ADMIN"}
+
+    accepted["credentials"] = [replacement]
+    user.metadata.annotations[ACCEPTED_CREDENTIALS_ANNOTATION] = json.dumps(accepted)
+    fixture.put(user, "users")
+    renewed = worker.reconcile(user, [], [])
+    assert renewed.name == original.name
+    assert condition(renewed).status == "True"
+    assert {record.fingerprint_sha256 for record in projector.seen_previous[-1]} == {"a" * 64, "b" * 64}
+    assert [(grant.credential.fingerprint_sha256, grant.tak_role) for grant in projector.seen_credentials[-1]] == [
+        ("b" * 64, "ROLE_ADMIN")
+    ]
+    assert len([item for item in fixture.objects.values() if isinstance(item, UserBinding)]) == 1
+    assert renewed.metadata is not None and renewed.metadata.annotations is not None
+    applied = json.loads(renewed.metadata.annotations["integration.opendefence.fi/applied-credentials"])
+    assert [(item["fingerprintSha256"], item["serialHex"]) for item in applied["credentials"]] == [("b" * 64, "2")]
 
 
 def test_full_readback_and_refresh() -> None:

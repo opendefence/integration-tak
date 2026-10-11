@@ -93,8 +93,10 @@ class Projector(Protocol):
         Read TAK state because the binding may predate this annotation or a write may be partial.
         An empty desired set removes access.
         Implementations own one JVM in this process and return Python values only.
+        One User owns one TAK account; multiple desired credentials can access it.
         Apply each desired grant to its exact fingerprint and issuer/serial pair.
-        Remove grants for credentials absent from desired before confirming readback.
+        Remove only credentials absent from desired before confirming readback.
+        Keep the account, role, and remaining credentials during rollover.
         A receipt requires verified messaging AND API enforcement. Never synthesize
         it from file-auth or scalar registerCert results.
         """
