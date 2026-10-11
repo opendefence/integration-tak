@@ -86,6 +86,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -129,9 +130,11 @@ spec:
         - name: admin-certificate
           secret:
             secretName: tak-integration-admin # pragma: allowlist secret
-            optional: true
+            defaultMode: 288
             items:
               - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+              - {key: ca.crt, path: ca.crt}
 ---
 apiVersion: v1
 kind: Service

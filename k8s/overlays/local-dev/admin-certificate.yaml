@@ -1,0 +1,10 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tak-integration-admin
+spec:
+  secretName: tak-integration-admin # pragma: allowlist secret
+  commonName: integration-tak-admin
+  privateKey: {algorithm: RSA, size: 2048}
+  usages: [digital signature, client auth]
+  issuerRef: {kind: ClusterIssuer, name: public-issuer}

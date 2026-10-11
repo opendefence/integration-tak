@@ -151,17 +151,20 @@ Implement these inputs when their versioned contracts are available:
 5. Trusted ingress routing, header stripping, direct-service isolation, and compatible TLS policy for protected and certificate-free routes.
 
 The integration operator uses a dedicated client certificate for TAK's port 8443 REST API.
-Supply `tak-integration-admin` with `tls.crt` in the integration namespace.
+The local Zarf flavor creates `tak-integration-admin` through cert-manager and `public-issuer`.
+Supply `tak-integration-admin` in the integration namespace for a production deployment.
 Use `integration-tak-admin` as the certificate CN.
-Store the matching private key in the same Secret for later 8443 REST calls.
-The current JNI bootstrap mounts only the public certificate.
+Store `tls.crt`, `tls.key`, and `ca.crt` in the same Secret.
+The operator mounts these files with group-only access to the private key.
+The delivery API Pod does not mount this Secret.
 The operator registers the certificate as an administrator through JNI and verifies the stored fingerprint and role.
 It rejects a different fingerprint under the same CN to avoid replacing an existing administrator.
 Ensure that TAK also trusts the certificate for TLS client authentication before using the REST API.
 In strict mode, bind the certificate to the installed integration identity. The current TAK candidate pins its exact public leaf through `tak-integration-admin`; no second certificate approval is required.
 Issue the certificate from a CA in TAK's client truststore.
-Certificate creation and rotation need an agreed issuer and trust update contract.
-Verify TLS authentication and administrator access after bootstrap.
+Production issuance and rotation need an agreed issuer and trust update contract.
+Do not rely on automatic renewal until the operator can replace and verify the pinned administrator fingerprint.
+Run `task --yes smoke` to verify local TLS authentication and administrator access after bootstrap.
 Keep this management identity separate from user credentials and the delivery API workload.
 
 ## Kubernetes composition
@@ -179,11 +182,9 @@ API TCP probes establish process reachability only; they do not establish curren
 
 Check out the versioned TAK Server repository beside this one. Provision the
 database and required identity/password Secrets in `integration-tak` as described
-in [its Kubernetes guide](../../tak-server/k8s/README.md). Create the namespace,
-apply `k8s/stack/schema` and wait for `tak-schema-5-8-84` to complete. Apply
-`k8s/stack/grants` and wait for `tak-grants-5-8-84` to complete before applying
-`k8s/stack`. These Jobs are separate so the installer can require their success
-before starting server Pods.
+in [its Kubernetes guide](../../tak-server/k8s/README.md).
+Run `task --yes up` for the local cluster and identities.
+This repository's Zarf package waits for `tak-schema-5-8-92` and `tak-grants-5-8-92` before it starts TAK Server.
 An installation overlay must pin accepted image digests, set the server address,
 database endpoint, storage class and real public origin. The checked-in image tags
 and settings are local candidates, not a deployable release.

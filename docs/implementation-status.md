@@ -9,12 +9,13 @@ I2 includes the package builder, seven REST operations, Secret-backed grants and
 The operator now starts one TAKCL JVM and checks the remote user manager on each scan.
 It can register a dedicated `integration-tak-admin` certificate through JNI and verify the stored fingerprint and role.
 The local 5.8.92 operator image passed the native JNI runtime check.
-The current Kind namespace has no `tak-ignite` Service, so remote management and administrator registration remain untested.
+The current Kind namespace has a ready `tak-ignite` Service and TAK Server StatefulSet.
+The operator registered `integration-tak-admin` through JNI, and its certificate authenticated to the 8443 REST API.
 Strict projection and Core authorization remain unavailable. UserBinding readiness stays false.
 The stack Kustomization composes the sibling TAK Server integrated overlay with the
 integration workloads. Separate entry points render the schema and grants Jobs.
-`kubectl kustomize` rendered 21 unique stack resources and both namespaced Jobs
-using the current sibling checkout; no resources were applied to a cluster.
+`kubectl kustomize` rendered the stack and both namespaced Jobs using the sibling checkout.
+The integration Zarf package now deploys the TAK schema, grants and server components.
 The Zarf package has `local-dev` and `production` manifest flavors.
 Both flavors built as ARM64 archives and passed lint and manifest inspection with explicit variables.
 The local archive deployed to `kind-opendefence-dev` after the Core CRDs were installed.
@@ -26,13 +27,13 @@ Kubernetes removed the binding after the test User was deleted.
 Service-account checks allowed the API to get and update the named grant Secret.
 They denied Secret lists and access to `private-registry`.
 The operator could list Users and update binding status. It could not get Secrets or create Users.
-The package does not bundle images. Local Kind needs loaded images.
-Production needs reachable registry images and explicit deploy variables.
+The package bundles the TAK image. Local Kind uses loaded images for connected development deployment.
+Production needs reachable API and operator images and explicit deploy variables.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. The operator uses
 `lib-opendefence-core==0.2.1+261010` models from the user-supplied Nexus index.
 Production authorization and credential adapters still need semantic contracts.
-The release-92 operator image also passed a native JNI check and a Kind binding lifecycle check.
+The release-92 operator image also passed a native JNI check, a Kind binding lifecycle check, and live administrator registration.
 The integration is not release-ready.
 
 | Gate | Required setting | Confirmation |
@@ -230,11 +231,11 @@ Only ARM64 was run locally.
 Owned resources are these images, temporary build containers, and the separate strict-fingerprint server worktree.
 Smoke containers used `--rm` and have exited.
 Unrelated Podman state was preserved.
-The current test context is `kind-opendefence-dev`, namespace `integration-tak`.
+The test context at this earlier checkpoint was `kind-opendefence-dev`, namespace `integration-tak`.
 The five supplied Core CRDs and the Zarf local package were installed there.
 The package runs the API and operator images built from this checkout.
-The running operator uses the 5.8.92 smoke image. No test User or UserBinding remains.
-No PVCs or registry publications were changed.
+The operator used the 5.8.92 smoke image. No test User or UserBinding remained.
+No PVCs or registry publications changed at that checkpoint.
 Temporary I1 evidence remains in `/private/tmp/integration-tak-i1/`.
 Temporary I2 test and build logs remain in `/private/tmp/integration-tak-*-i2.log`.
 No fixture keys, certificates, or ZIPs were saved as evidence.
@@ -269,6 +270,22 @@ This check does not prove strict authentication or production projection.
 The stack, schema, and grants Kustomizations render against sibling commit `fe13b7d`.
 The stack has 21 resources and sets `LDAP_UPDATE_INTERVAL=60` and `TAK_AUTH_MODE=legacy`.
 No server resource from this render was applied to a cluster.
+
+## 2026-10-11 local server and administrator mTLS
+
+The integration package deployed the TAK schema Job, grants Job, and singleton StatefulSet to `kind-opendefence-dev`.
+The schema, grants, and bootstrap Jobs completed. The TAK Server and both integration Deployments became Ready.
+The `tak-ignite` Service provides the operator's JNI management connection.
+The local Zarf flavor issued `tak-integration-admin` through cert-manager and `public-issuer`.
+The operator mounted the certificate, key, and CA bundle. The key file has mode `0440` and group `10001`.
+The delivery API Pod did not mount the key.
+The operator registered the certificate as `integration-tak-admin` through JNI.
+`task --yes smoke` returned HTTP 200 from TAK's 8443 REST API with both the probe and integration identities.
+The integration request verified the server name and CA and listed `integration-tak-admin`.
+A request without a client certificate received no HTTP response.
+The operator logged temporary management errors while TAK restarted. The errors stopped after TAK became Ready.
+These checks do not prove strict admission, Core authorization, or safe administrator certificate rotation.
+The local certificate is for the disposable test cluster. Production must supply an identity from a CA trusted by TAK.
 
 ## Next action
 

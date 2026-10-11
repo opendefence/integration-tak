@@ -17,6 +17,7 @@ Check out `tak-server` beside this repository.
 Install Kind, Zarf, kubectl, and Docker or Podman.
 Run `task --yes up` with Task 3.53 or newer to start the local Kind cluster and registries.
 The task installs the base operators, local TAK database and identities.
+The local Zarf flavor issues `tak-integration-admin` for the operator.
 It builds and loads the three images, deploys this repository's Zarf package, and checks authenticated TAK HTTPS.
 The task uses the remote Taskfiles from `opendefence/base`.
 Task asks you to trust the remote source on first use if you omit `--yes`.

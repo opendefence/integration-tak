@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: integration-tak
 resources:
   - ../production
+  - admin-certificate.yaml
 patches:
   - target: {kind: Deployment, name: integration-tak-api}
     patch: |-

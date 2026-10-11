@@ -85,7 +85,21 @@ tasks:
       - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak rollout restart statefulset/tak-server
 
   smoke:
-    desc: Check TAK readiness and authenticated HTTPS
+    desc: Check TAK readiness and both administrator HTTPS identities
     cmds:
       - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak rollout status statefulset/tak-server --timeout=300s
       - kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak exec tak-server-0 -c api -- curl --silent --show-error --fail --cacert /probe/ca.crt --cert /probe/tls.crt --key /probe/tls.key --output /dev/null --write-out '%{http_code}\n' https://{{.TAK_SERVER_ADDRESS}}:8443/Marti/api/user-management/api/list-users
+      - |
+        kubectl --context {{.TAK_KUBE_CONTEXT | shellQuote}} -n integration-tak exec deployment/integration-tak-operator -- sh -ec '
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            response=$(printf "GET /Marti/api/user-management/api/list-users HTTP/1.1\r\nHost: {{.TAK_SERVER_ADDRESS}}\r\nConnection: close\r\n\r\n" |
+              openssl s_client -quiet -connect tak-server:8443 -servername {{.TAK_SERVER_ADDRESS}} -verify_hostname {{.TAK_SERVER_ADDRESS}} -verify_return_error -cert /var/run/tak-admin/tls.crt -key /var/run/tak-admin/tls.key -CAfile /var/run/tak-admin/ca.crt 2>/dev/null || true)
+            if printf "%s" "$response" | grep -q "^HTTP/1.1 200 " && printf "%s" "$response" | grep -Fq "integration-tak-admin"; then
+              printf "Integration administrator HTTPS: 200\n"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Integration administrator HTTPS did not become ready" >&2
+          exit 1
+        '
