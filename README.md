@@ -129,7 +129,25 @@ Checks run on pull requests and pushes to `main`.
 The shared Python setup installs all extras, so its job requires a JDK.
 The image job tests the API environment and both runtime targets.
 
-Publishing uses `arc-runner-set` and the shared publisher.
+The Zarf build job runs on native AMD64 and ARM64 hosted runners.
+Set these repository variables before running the package jobs:
+
+| Variable | Value |
+| --- | --- |
+| `TAK_SERVER_IMAGE` | Published TAK Server container reference with an `@sha256:` digest. The image must support both architectures. |
+| `PUBLISH_ENABLED` | Set to `true` to publish images and Zarf packages after all checks pass. |
+
+The build fails if the TAK Server image reference is missing or malformed.
+CI reads the image's `org.opencontainers.image.revision` label.
+This label must contain the full 40-character source commit from `opendefence/tak-server`.
+CI checks out that commit to use the matching integrated overlays.
+The tak-operator build reads `UserManager.jar` from the same TAK Server image that the package contains.
+The runtime check compares the JAR hash with that source image before packaging.
+CI archives contain the exact locally built API and tak-operator images, read through an OCI image archive.
+The build uploads the production archives as `zarf-amd64` and `zarf-arm64` workflow artifacts.
+The `local-dev` flavor is linted but is not published.
+
+Publishing uses `arc-runner-set` and the shared image publisher.
 Keep `PUBLISH_ENABLED` unset until registry setup and runtime acceptance are complete.
 The publisher requires Docker CLI access and native AMD64 and ARM64 BuildKit services.
 The services must be reachable at `buildkit-amd64.buildkit.svc.cluster.local:1234`
@@ -138,6 +156,22 @@ Mount readable `ca.crt`, `tls.crt` and `tls.key` files at `/etc/buildkit/tls` on
 The shared action configures remote Buildx and validates these runner inputs.
 Use the repository's `GITHUB_TOKEN` for GHCR.
 No registry credentials are copied from the prototype.
+
+Zarf publication follows the sibling `base` workflow.
+The job downloads the checked archives and signs them with the GitHub OIDC identity.
+It publishes them to `ghcr.io/<owner>/integration-tak` with the shared image publisher's tag rules:
+
+| Event | Tags |
+| --- | --- |
+| Pull request N from this repository | `VERSION-prN-DATE`, `VERSION-prN`, and `N-merge`. |
+| Push or manual run on `main` | `VERSION-DATE`, `VERSION`, `VERSION-local`, `main`, and `latest`. |
+| Manual run on another branch | The branch name with `/` replaced by `-`, then OCI tag normalization. |
+
+`DATE` is the UTC build time in `YYYYMMDDTHHMM` format.
+The `VERSION-local` alias contains the production flavor, as do the other published tags.
+Fork pull requests build artifacts but cannot publish or use the publishing runners.
+The publish job updates the AMD64 and ARM64 entries in each OCI index in sequence.
+The image publisher also receives the package's version tag so connected deployments can pull matching image tags.
 
 Snyk is disabled unless `SNYK_ENABLED` is `true`.
 Set `SNYK_ORG` and the `SNYK_TOKEN` secret before enabling it.

@@ -11,11 +11,37 @@ permissions:
 
 jobs:
   version:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      tags: ${{ steps.metadata.outputs.tags }}
     steps:
       - uses: actions/checkout@v7
       - uses: pvarki/config-ci-library/.github/actions/validate-bumpversion@1786399bf62c2b691f1e8fb9dcfc7a0be72a2846
+        if: github.event_name == 'pull_request'
+      - name: Read package version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open(".bumpversion.toml", "rb"))["tool"]["bumpversion"]["current_version"])')
+          echo "version=${version//+/-}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y%m%dT%H%M)" >> "$GITHUB_OUTPUT"
+          echo "ref_no_slashes=${REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+      - name: Generate package tags
+        id: metadata
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/integration-tak
+          # Keep these rules aligned with config-ci-library's publish-image action.
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_date }},enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}-local,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}-pr${{ github.event.number }}-${{ steps.version.outputs.build_date }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=${{ steps.version.outputs.version }}-pr${{ github.event.number }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=${{ steps.version.outputs.ref_no_slashes }}
+            type=raw,value=latest,enable={{is_default_branch}}
 
   python:
     runs-on: ubuntu-latest
@@ -81,9 +107,106 @@ jobs:
           snyk-org: ${{ vars.SNYK_ORG }}
           snyk-token: ${{ secrets.SNYK_TOKEN }}
 
+  zarf:
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-latest
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    defaults:
+      run:
+        shell: bash
+        working-directory: integration-tak
+    env:
+      PACKAGE_VERSION: ${{ needs.version.outputs.version }}
+      TAK_SERVER_IMAGE: ${{ vars.TAK_SERVER_IMAGE }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: integration-tak
+          persist-credentials: false
+      - name: Resolve the TAK Server source revision
+        id: tak-server
+        run: |
+          if [[ ! "$TAK_SERVER_IMAGE" =~ ^[^[:space:]]+@sha256:[a-f0-9]{64}$ ]]; then
+            echo 'Set TAK_SERVER_IMAGE to a published TAK Server image digest' >&2
+            exit 1
+          fi
+          docker pull "$TAK_SERVER_IMAGE"
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$TAK_SERVER_IMAGE")
+          if [[ ! "$revision" =~ ^[a-f0-9]{40}$ ]]; then
+            echo 'The TAK Server image must label its full source commit in org.opencontainers.image.revision' >&2
+            exit 1
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          repository: opendefence/tak-server
+          ref: ${{ steps.tak-server.outputs.revision }}
+          path: tak-server
+          persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          working_directory: integration-tak
+          install_args: zarf
+      - name: Build and check the bundled runtimes
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          jar_sha256=$(docker run --rm --entrypoint sha256sum "$TAK_SERVER_IMAGE" /opt/tak/utils/UserManager.jar)
+          jar_sha256="${jar_sha256%% *}"
+          [[ "$jar_sha256" =~ ^[a-f0-9]{64}$ ]]
+          for runtime in api operator; do
+            image="ghcr.io/$owner/integration-tak-$runtime:$PACKAGE_VERSION"
+            docker build --target "$runtime" --build-arg "TAKSERVER_IMAGE=$TAK_SERVER_IMAGE" -t "$image" .
+            docker run --rm "$image" --help
+            docker run --rm "$image" --version
+            docker run --rm -i --entrypoint python "$image" - "$runtime" --jar-sha256 "$jar_sha256" < docker/check_runtime.py
+            echo "${runtime^^}_IMAGE=$image" >> "$GITHUB_ENV"
+          done
+      - name: Build the Zarf archive
+        id: package
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          export INTEGRATION_IMAGES_ARCHIVE="$RUNNER_TEMP/integration-images.tar"
+          docker save --output "$INTEGRATION_IMAGES_ARCHIVE" "$API_IMAGE" "$OPERATOR_IMAGE"
+          # Read the built images from the archive, even if an older registry tag exists.
+          zarf tools yq -i '
+            .metadata.version = strenv(PACKAGE_VERSION) |
+            (.components[] | select(.name == "integration-production")) |=
+              (.imageArchives = [{"path": strenv(INTEGRATION_IMAGES_ARCHIVE), "images": .images}] | del(.images))
+          ' zarf.yaml
+          templates="TAK_IMAGE=$TAK_SERVER_IMAGE,API_IMAGE=$API_IMAGE,OPERATOR_IMAGE=$OPERATOR_IMAGE"
+          zarf dev lint . --flavor local-dev --set "$templates"
+          zarf dev lint . --flavor production --set "$templates"
+          build_dir="$(mktemp -d "$RUNNER_TEMP/zarf-build.XXXXXX")"
+          zarf package create . --architecture "$ARCHITECTURE" --flavor production \
+            --set "$templates" --confirm --output "$build_dir"
+          shopt -s nullglob
+          packages=("$build_dir"/zarf-package-*.tar.zst)
+          if [[ ${#packages[@]} -ne 1 ]]; then
+            echo 'Expected exactly one Zarf package archive' >&2
+            exit 1
+          fi
+          echo "archive=${packages[0]}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zarf-${{ matrix.architecture }}
+          path: ${{ steps.package.outputs.archive }}
+          compression-level: 0
+          if-no-files-found: error
+
   publish:
-    needs: [python, images]
-    if: vars.PUBLISH_ENABLED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [version, python, images, zarf]
+    if: >-
+      vars.PUBLISH_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: arc-runner-set
     permissions:
       contents: read
@@ -98,4 +221,57 @@ jobs:
           product: integration-tak
           component: ${{ matrix.runtime }}
           target: ${{ matrix.runtime }}
+          extra-tag: ${{ needs.version.outputs.version }}
+          build-args: |
+            TAKSERVER_IMAGE=${{ vars.TAK_SERVER_IMAGE }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-zarf:
+    needs: [version, zarf, publish]
+    runs-on: arc-runner-set
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    concurrency:
+      group: zarf-publish-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: zarf
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: zarf-*
+          merge-multiple: true
+          path: dist/zarf
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sign and publish the checked archives
+        env:
+          PACKAGE_TAGS: ${{ needs.version.outputs.tags }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=(dist/zarf/zarf-package-*.tar.zst)
+          if [[ ${#packages[@]} -ne 2 ]]; then
+            echo 'Expected the AMD64 and ARM64 Zarf archives' >&2
+            exit 1
+          fi
+          # Serialize architectures so updates to each OCI index cannot race.
+          for package in "${packages[@]}"; do
+            zarf package sign "$package" --keyless --confirm
+            while IFS= read -r reference; do
+              zarf package publish "$package" "oci://${reference%/*}" --tag "${reference##*:}" --confirm
+              printf -- '- `%s` (%s)\n' "$reference" "$(basename "$package")" >> "$GITHUB_STEP_SUMMARY"
+            done <<< "$PACKAGE_TAGS"
+          done

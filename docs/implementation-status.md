@@ -49,6 +49,11 @@ They denied Secret lists and access to `private-registry`.
 The tak-operator could list Users and update binding status. It could not get Secrets or create Users.
 The package bundles the API, tak-operator, and TAK Server images.
 Image selection is fixed at package creation. Local Kind uses loaded images for connected development deployment.
+CI builds AMD64 and ARM64 production archives and lints both flavors.
+CI publication signs the checked archives and uses separate PR and main tags.
+The package jobs require the `TAK_SERVER_IMAGE` repository variable.
+CI selects the matching overlays from the image's source revision label.
+Hosted builds, OIDC signing, and GHCR publication still need a workflow run with that input.
 Production Core authority and strict TAK projection adapters remain unavailable. Defaults return `503` or `Synced=False`.
 Core CRD shapes and UserBinding ownership are supplied. The tak-operator uses
 `lib-opendefence-core==0.2.2+261011` models from the user-supplied Nexus index.
