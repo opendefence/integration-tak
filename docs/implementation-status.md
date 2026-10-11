@@ -368,8 +368,35 @@ The simulated User CRs and their UserBindings remain in the cluster.
 
 The local suite passed 294 tests and skipped 2 tests, with 94.11% coverage.
 These checks prove native reconciliation and the tested HTTP role decisions.
-They do not prove strict messaging admission, cached-session revocation, or an authority expiry bound.
+They do not prove strict messaging admission or an authority expiry bound.
 Bindings remain `Synced=False` with `EnforcementUnverified`.
+
+## Live enforcement checks, 2026-10-11
+
+The checks used implementation `41fd261` and the image recorded in the evidence file.
+These checks predate the connection removal in `7537dc2`.
+They do not verify the current tak-operator disconnect behavior.
+
+The running cluster supports enforcement tests without the core-operator.
+The tests changed the simulated User status with `kubectl`.
+The tak-operator applied each change through JNI.
+The tests waited for native record readback before checking access.
+
+| Check | Result |
+| --- | --- |
+| Remove `superadmin` while an HTTP session stays open | Passed on the tested admin endpoint. HTTP changed from 200 to 403 on the same TLS socket with the issued session cookie. A fresh connection also returned 403. |
+| Exchange CoT between two approved Users in the same projected group | Passed in both directions. |
+| Deny CoT from unaccepted and retired certificates | Failed. Both certificates sent CoT to an approved admin client. They also exchanged CoT with each other. |
+| Remove group access from an existing CoT connection | Failed. With both Users set to `ROLE_READONLY`, the existing connection retained group access in both directions after native group removal. |
+| Remove group access from a fresh CoT connection | Passed for the tested group. Messages did not pass in either direction during each four-second observation. |
+
+The certificate admission and existing-connection failures prevent an enforcement readiness claim.
+They do not prevent further tests.
+The final fixture retains the superadmin's certificate B and the basic User's certificate.
+Both Users again have `tak-sim-team`; only the superadmin has `superadmin`.
+No approved User CR was deleted.
+See [the test method and observations](evidence/i2-native-enforcement.txt).
+TLS session resumption, message storage, and an authority expiry bound remain untested.
 
 ## Next action
 

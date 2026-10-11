@@ -1,0 +1,77 @@
+Live native enforcement observations: 2026-10-11
+
+Environment
+- Repository implementation: 41fd261.
+- Kubernetes context: kind-opendefence-dev.
+- Namespace: integration-tak.
+- TAK Server: 5.8.92. Native authentication was active.
+- Messaging configuration: x509groups="true", x509addAnonymous="false".
+- tak-operator image ID: 6c5f3245bfefbd865a26e6392f8f74205b4780a3ee8bcb55f46127db4bff4d1e.
+- The core-operator was absent. User projections were simulated.
+
+Method
+1. Forward service/tak-server ports 8443 and 8089 to local ports 18443 and 18089.
+2. Load test credentials from the dedicated tak-sim-* Secrets.
+3. Validate the server certificate chain and hostname tak.localtest.me.
+4. Patch User.status.roles and User.status.groups with kubectl --subresource=status.
+5. Wait for the tak-operator to update /opt/tak/auth/UserAuthenticationFile.xml.
+6. Wait two more seconds before testing a removal.
+7. Use the XML event format from ../tak-server/tests/check-cot.py.
+8. Send a presence event on each CoT connection.
+9. Use a unique event UID for each routing check.
+10. Observe each routing check for four seconds.
+11. Restore each User's initial roles and groups in a finally block.
+
+Temporary files held client keys with mode 0600 inside a private temporary directory.
+The scripts removed those files when the tests ended.
+No keys or session cookies are included in this record.
+
+HTTP result
+- Endpoint: /Marti/api/user-management/api/list-users.
+- Certificate: tak-sim-superadmin-b.
+- Initial request: HTTP 200. The server issued a session cookie.
+- Remove the projected superadmin role. Keep tak-sim-team.
+- Native readback: ROLE_READONLY, group tak-sim-team.
+- Repeat the request on the same TLS socket with the issued cookie: HTTP 403.
+- Repeat with a new TLS connection: HTTP 403.
+- Restore superadmin. Native readback: ROLE_ADMIN, group tak-sim-team.
+
+CoT observations with the superadmin role
+- The approved superadmin and basic User exchanged CoT in both directions.
+- Basic User -> approved superadmin: delivered.
+- Basic User -> unaccepted and retired certificates: no delivery observed.
+- Unaccepted certificate -> approved superadmin: delivered.
+- Retired certificate -> approved superadmin: delivered.
+- Neither unaccepted nor retired certificate reached the basic User in that check.
+- Admin -> basic User remained delivered after group removal on existing and new connections.
+  Admin routing can confound a group isolation check. The next test removed that role.
+
+CoT observations with both approved Users set to ROLE_READONLY
+- Both Users initially had tak-sim-team. The baseline event was delivered.
+- Unaccepted certificate -> retired certificate: delivered.
+- Unaccepted certificate -> either approved User: no delivery observed.
+- Remove tak-sim-team from the basic User. Native readback had no groups.
+- Existing basic connection -> approved peer: delivered.
+- Approved peer -> existing basic connection: delivered.
+- Close the basic connection. Reconnect with the same certificate.
+- Fresh basic connection -> approved peer: no delivery observed.
+- Approved peer -> fresh basic connection: no delivery observed.
+- Fresh basic connection -> unaccepted certificate: delivered.
+
+Interpretation and limits
+- The tested HTTP session lost its admin permission after JNI reconciliation.
+- Native group removal did not remove the existing CoT connection's group access.
+- Reconnection removed access to the tested group.
+- Certificate admission failed: unaccepted and retired certificates routed CoT.
+- The tests did not identify the internal cause of the routing behavior.
+- The tests did not check TLS session resumption, message storage, or authority expiry.
+- Absence of a message applies only to the stated observation interval.
+- The tests did not establish a maximum permission-removal delay.
+- These failures prevent enforcement readiness. They do not block testing.
+
+Restored state
+- tak-sim-superadmin: superadmin, tak-sim-team, accepted certificate B only.
+- tak-sim-basic: no explicit roles, tak-sim-team, accepted basic certificate.
+- Native records confirmed both restored projections.
+- No approved User CR was deleted.
+- UserBindings remain Synced=False with EnforcementUnverified.
